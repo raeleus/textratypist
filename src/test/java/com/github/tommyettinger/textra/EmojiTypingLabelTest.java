@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.RandomXS128;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Cell;
@@ -27,11 +28,7 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
     Stage       stage;
     SpriteBatch batch;
     TypingLabel label;
-    TextButton  buttonPause;
-    TextButton  buttonResume;
-    TextButton  buttonRestart;
-    TextButton  buttonRebuild;
-    TextButton  buttonSkip;
+    TypingLabel debugLabel;
 
     @Override
     public void create() {
@@ -43,7 +40,7 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
         float scale = 0.5f;
         skin.getFont("default-font").getData().setScale(scale);
         stage = new Stage(new StretchViewport(720, 405), batch);
-//        stage.setDebugAll(true);
+        stage.setDebugAll(true);
         Gdx.input.setInputProcessor(stage);
 
         final Table table = new Table();
@@ -52,58 +49,35 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
 
         label = createTypingLabel();
 
-//        buttonPause = new TextButton("Pause", skin);
-//        buttonPause.addListener(new ClickListener() {
-//            @Override
-//            public void clicked(InputEvent event, float x, float y) {
-//                label.pause();
-//            }
-//        });
-//
-//        buttonResume = new TextButton("Resume", skin);
-//        buttonResume.addListener(new ClickListener() {
-//            @Override
-//            public void clicked(InputEvent event, float x, float y) {
-//                label.resume();
-//            }
-//        });
-//
-//        buttonRestart = new TextButton("Restart", skin);
-//        buttonRestart.addListener(new ClickListener() {
-//            @Override
-//            public void clicked(InputEvent event, float x, float y) {
-//                label.restart();
-//            }
-//        });
-//
-//        buttonRebuild = new TextButton("Rebuild", skin);
-//        buttonRebuild.addListener(new ClickListener() {
-//            @Override
-//            public void clicked(InputEvent event, float x, float y) {
-//                adjustTypingConfigs();
-//                Cell<TypingLabel> labelCell = table.getCell(label);
-//                label = createTypingLabel();
-//                labelCell.setActor(label);
-//            }
-//        });
-//
-//        buttonSkip = new TextButton("Skip", skin);
-//        buttonSkip.addListener(new ClickListener() {
-//            @Override
-//            public void clicked(InputEvent event, float x, float y) {
-//                label.skipToTheEnd();
-//            }
-//        });
+        debugLabel = new TypingLabel("", label.font);
+        debugLabel.setTypingListener(new TypingAdapter() {
+            @Override
+            public void event(String event) {
+                System.out.println("Event: " + event);
+                if(event.startsWith("seed "))
+                {
+                    Gdx.app.getClipboard().setContents(event.substring(5));
+                }
+            }
+        });
 
         table.pad(50f);
         table.add(label).colspan(5).growX();
         table.row();
         table.row().uniform().expand().growX().space(40).center();
-//        table.add(buttonPause, buttonResume, buttonRestart, buttonSkip, buttonRebuild);
+        table.add(debugLabel);
 
         table.pack();
     }
 
+    public void updateDebugLabel() {
+        String seed = ((RandomXS128)MathUtils.random).getState(0)+" "+((RandomXS128)MathUtils.random).getState(1);
+        debugLabel.restart(
+                "fps: "+Gdx.graphics.getFramesPerSecond()+"\n" +
+                        "seed: {TRIGGER=seed "+seed+"}"+seed+"{ENDTRIGGER}"
+        );
+        debugLabel.skipToTheEnd(false, false);
+    }
     public void adjustTypingConfigs() {
         // Only allow two chars per frame
         TypingConfig.CHAR_LIMIT_PER_FRAME = 2;
@@ -112,7 +86,7 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
         TypingConfig.DEFAULT_CLEAR_COLOR = Color.WHITE;
 
         // Create some global variables to handle style
-        TypingConfig.GLOBAL_VARS.put("ICE_WIND", "{FASTER}{GRADIENT=88ccff;eef8ff;-0.5;5}{SLOWER}{WIND=2;4;0.25;0.1}");
+        TypingConfig.GLOBAL_VARS.put("ICE_WIND", "{GRADIENT=88ccff;eef8ff;-0.5;5}{WIND=2;4;0.25;0.1}{JOLT=1;0.6;inf;0.1;;}");
     }
 
     public TypingLabel createTypingLabel() {
@@ -120,7 +94,7 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
 //        Font font = new Font("dawnlike/PlainAndSimplePlus-standard.fnt", atlas.findRegion("PlainAndSimplePlus-standard"), 0, 0, 2, 2);
 //        font.addImage("😀", atlas.findRegion("love box")).addImage("💀", atlas.findRegion("hate box"));
 //        font.scale(2, 2);
-        Font font = KnownFonts.addEmoji(KnownFonts.getYanoneKaffeesatz());
+        Font font = KnownFonts.addEmoji(KnownFonts.getNowAlt());
 
 //        Font font = new Font(KnownFonts.getOpenSans().scale(0.5f, 0.5f).setTextureFilter());
         // Create label
@@ -145,7 +119,7 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
 
                 "I love TextraTypist! [+saxophone]{HEARTBEAT}[+😍]{ENDHEARTBEAT}[+🎷]\n"
                 + "But... {SICK}U. Nitty{ENDSICK} doesn't. {CROWD}[#BB1100][+skull][#55AA22][+🤡]{ENDCROWD}{CLEARCOLOR}\n"
-                + "Scale testing: [_][~][%25]go[%50]go[%75]go[red][%100]go[white][%125]go[%150]go[%175]go[%200]go![]\n"
+                +"[+⚖][~][_][+⚖][ ] testing: [_][~][%25]go[%50]go[%75]go[red][%100]go[white][%125]go[%150]go[%175]go[%200]go[%225]go[%250]go![ ]\n"
                 + "{NATURAL=0.5}Natural testing: The quick brown fox jumps over the lazy dog."
                 ,
 //
@@ -170,12 +144,11 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
 //        final TypingLabel label = new TypingLabel("WELCOME [/]TO THE [*][GREEN]JUNGLE[]!", skin);
 //        final TypingLabel label = new TypingLabel("{WAIT=1}{SLOWER}Welcome, {VAR=title}!", skin);
         label.align = Align.topLeft;
-
+        label.debug();
         // Make the label wrap to new lines, respecting the table's layout.
         label.wrap = true;
-        label.layout.maxLines = 15;
 //        label.layout.setTargetWidth(label.layout.getWidth());
-        label.layout.setTargetWidth(Gdx.graphics.getBackBufferWidth() - 100);
+        label.setWidth(Gdx.graphics.getBackBufferWidth() - 100);
 
 //        label.setDefaultToken("{EASE}{FADE=0;1;0.33}");
 //
@@ -191,7 +164,6 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
 //                System.out.println(label.getIntermediateText());
 //            }
 //        });
-//
 //        // Finally parse tokens in the label text.
 //        label.parseTokens();
 
@@ -199,7 +171,9 @@ public class EmojiTypingLabelTest extends ApplicationAdapter {
     }
 
     public void update(float delta) {
+        label.font.strikeBreadth = MathUtils.sinDeg((TimeUtils.millis() & 0xFFFFFL) * 0.0625f) * 0.5f;
         stage.act(delta);
+        updateDebugLabel();
     }
 
     @Override

@@ -34,7 +34,7 @@ import static com.badlogic.gdx.utils.Align.center;
 public class SetTextTest extends ApplicationAdapter {
     ScreenViewport viewport;
     Stage stage;
-    String text;
+    String text, textra;
     TextraLabel textraLabel;
     TypingLabel typingLabel;
     RandomXS128 random;
@@ -47,9 +47,12 @@ public class SetTextTest extends ApplicationAdapter {
         stage.setDebugAll(true);
         random = new RandomXS128(ctr);
 
-        Font gentium = KnownFonts.getGentium();
+        Font roboto = KnownFonts.getRobotoCondensed();
 
-        text = "Satchmo is a cat, who is extremely fat; when he sits down, throughout the town, we all think, 'What was that? Did it happen again (that thunderous din)? What could ever make, such a powerful quake, but a cat with a double chin?'";
+        text = "Satchmo is a {RAINBOW}cat{RESET}, who is extremely {SPEED=0.05}fat{NORMAL}; when he sits " +
+                "{SHAKE}down{RESET}, throughout the town, we all {WAVE}think{RESET}, 'What was that? Did it happen " +
+                "again (that [*]thunderous[*] din)? What could ever make, such a [_]powerful[_] quake, but " +
+                "a cat with a [~][_]double[_][~] chin?'";
 //                "[*]Локус[*] [*]контроля[*] - свойство " +
 //                "личности приписывать " +
 //                "свои неудачи и успехи " +
@@ -59,8 +62,9 @@ public class SetTextTest extends ApplicationAdapter {
 //                "либо внутренним (я сам, " +
 //                "моё отношение, мои" +
 //                "действия)";
+        textra = text.replaceAll("\\{[^}]*}", "");
         typingLabel = new TypingLabel(
-                "", new Label.LabelStyle(), gentium);
+                "", new Label.LabelStyle(), roboto);
         typingLabel.setWrap(true);
         typingLabel.setAlignment(center);
         typingLabel.setMaxLines(2);
@@ -68,7 +72,7 @@ public class SetTextTest extends ApplicationAdapter {
         typingLabel.setText(text);
         typingLabel.skipToTheEnd();
         textraLabel = new TextraLabel(
-                "[RED]" + text, new Label.LabelStyle(), gentium);
+                "[RED]" + textra, new Label.LabelStyle(), roboto);
         textraLabel.setWrap(true);
         textraLabel.setAlignment(center);
         textraLabel.layout.setMaxLines(2);
@@ -86,17 +90,22 @@ public class SetTextTest extends ApplicationAdapter {
 
         stage.act();
         stage.draw();
-        System.out.println("!!!  On frame #" + ctr);
-        System.out.println(typingLabel.layout.toString());
-        System.out.println(typingLabel);
+//        System.out.println("!!!  On frame #" + ctr);
 
         random.setSeed(++ctr);
-        if ((ctr & 3) == 0) {
+        if ((ctr & 511) == 0) {
             System.out.println("typingLabel has " + typingLabel.getMaxLines() + " max lines and " + typingLabel.getEllipsis() + " ellipsis.");
             text = StringUtils.shuffleWords(text, random);
-            typingLabel.setText(text);
-            typingLabel.skipToTheEnd();
-            textraLabel.setText("[RED]" + text);
+            textra = text.replaceAll("\\{[^}]*}", "");
+//            typingLabel.activeEffects.clear();
+//            typingLabel.tokenEntries.clear();
+            typingLabel.setText(text); // broken regarding effects...
+            typingLabel.parseTokens(); // this is needed when using setText().
+//            typingLabel.restart(text); // this works on its own.
+//            typingLabel.skipToTheEnd();
+            textraLabel.setText("[RED]" + textra);
+            System.out.println(typingLabel.layout);
+            System.out.println(typingLabel);
         }
     }
 
@@ -123,7 +132,7 @@ public class SetTextTest extends ApplicationAdapter {
         config.setTitle("TextraLabel UI test");
         config.setWindowedMode(600, 480);
         config.disableAudio(true);
-		config.setForegroundFPS(2);
+		config.setForegroundFPS(60);
 //		config.setForegroundFPS(Lwjgl3ApplicationConfiguration.getDisplayMode().refreshRate);
         config.useVsync(true);
         new Lwjgl3Application(new SetTextTest(), config);

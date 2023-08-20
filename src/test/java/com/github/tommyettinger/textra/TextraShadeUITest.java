@@ -42,10 +42,10 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 public class TextraShadeUITest extends InputAdapter implements ApplicationListener {
 	String[] listEntries = {"This is a list entry1", "And another one1", "The meaning of life1", "Is hard to come by1",
-		"This is a list entry2", "And another one2", "The meaning of life2", "Is hard to come by2", "This is a list entry3",
-		"And another one3", "The meaning of life3", "Is hard to come by3", "This is a list entry4", "And another one4",
-		"The meaning of life4", "Is hard to come by4", "This is a list entry5", "And another one5", "The meaning of life5",
-		"Is hard to come by5"};
+			"This is a list entry2", "And another one2", "The meaning of life2", "Is hard to come by2", "This is a list entry3",
+			"And another one3", "The meaning of life3", "Is hard to come by3", "This is a list entry4", "And another one4",
+			"The meaning of life4", "Is hard to come by4", "This is a list entry5", "And another one5", "The meaning of life5",
+			"Is hard to come by5"};
 
 	Skin skin;
 	Stage stage;
@@ -73,13 +73,20 @@ public class TextraShadeUITest extends InputAdapter implements ApplicationListen
 //				KnownFonts.getCozette();
 
 				// below, 4 is -bmpFont.getDescent(); it is used because this particular font gets moved too high.
-				// the y adjustment can be seen as moving the lines rather than moving the text (Planet-Express-style).
+				// the y adjustment can be seen as, rather than moving the text, moving the lines (a la Planet Express).
 				new Font("RaeleusScriptius-standard.fnt", 0, 4, 0, 0);
 //				new Font(new BitmapFont(Gdx.files.internal("RaeleusScriptius-standard.fnt")), 0, 4, 0, 0);
-				//new Font(skin.get(LabelStyle.class).font)
+		//new Font(skin.get(LabelStyle.class).font)
 //				.adjustLineHeight(0.75f)
 //				.useIntegerPositions(true);
-		KnownFonts.addEmoji(font);
+//		font.setDescent(0);
+		KnownFonts.addEmoji(font, -16f, -8f, 0f);
+		final Font title = new Font(skin.get("title", Label.LabelStyle.class).font, 0, 2, 0, 0)
+//				.adjustLineHeight(1.5f)
+				.useIntegerPositions(true);
+//		title.setDescent(0);
+		System.out.println("RaeleusScriptius descent: " + font.descent);
+		System.out.println("Title descent: " + title.descent);
 
 		// stage = new Stage(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false, new PolygonSpriteBatch());
 		stage = new Stage(new ScreenViewport());
@@ -96,7 +103,7 @@ public class TextraShadeUITest extends InputAdapter implements ApplicationListen
 		Button imgButton = new Button(new Image(image), skin);
 		Button imgToggleButton = new Button(new Image(image), skin, "toggle");
 
-		TextraLabel myLabel = new TextraLabel("This is some text.", skin, "title");
+		TextraLabel myLabel = new TextraLabel("This is some text.", skin, "title", title);
 
 		Table t = new Table();
 		t.row();
@@ -122,8 +129,8 @@ public class TextraShadeUITest extends InputAdapter implements ApplicationListen
 			}
 		});
 		selectBox.setItems("Android1", "Windows1 long text in item", "Linux1", "OSX1", "Android2", "Windows2", "Linux2", "OSX2",
-			"Android3", "Windows3", "Linux3", "OSX3", "Android4", "Windows4", "Linux4", "OSX4", "Android5", "Windows5", "Linux5",
-			"OSX5", "Android6", "Windows6", "Linux6", "OSX6", "Android7", "Windows7", "Linux7", "OSX7");
+				"Android3", "Windows3", "Linux3", "OSX3", "Android4", "Windows4", "Linux4", "OSX4", "Android5", "Windows5", "Linux5",
+				"OSX5", "Android6", "Windows6", "Linux6", "OSX6", "Android7", "Windows7", "Linux7", "OSX7");
 		selectBox.setSelected("Linux6");
 		Image imageActor = new Image(image2);
 		ScrollPane scrollPane = new ScrollPane(imageActor);
@@ -139,18 +146,18 @@ public class TextraShadeUITest extends InputAdapter implements ApplicationListen
 		rightSideTable.add(minSizeLabel).growX().row();
 		rightSideTable.add(scrollPane2).grow();
 		SplitPane splitPane = new SplitPane(scrollPane, rightSideTable, false, skin, "default-horizontal");
-		fpsLabel = new TextraLabel("fps: 60...[~]I think[]...", skin.get("title", LabelStyle.class), font);
+		fpsLabel = new TextraLabel("fps: 60...[~]I think[ ]...", skin.get("title", LabelStyle.class), font);
 		fpsLabel.setAlignment(Align.left);
 		// configures an example of a TextField in password mode.
-		passwordLabel = new TextraLabel("Textfield in [~]secure[] password mode: ", skin.get("title", LabelStyle.class), font);
+		passwordLabel = new TextraLabel("Textfield in [~]secure[ ] password mode: ", skin.get("title", LabelStyle.class), font);
 		final TextField passwordTextField = new TextField("", skin);
 		passwordTextField.setMessageText("password");
 		passwordTextField.setPasswordCharacter('*');
 		passwordTextField.setPasswordMode(true);
 
 		// window.debug();
-		TextraWindow window = new TextraWindow("TextraDialog", skin);
-		window.getTitleTable().add(new TextraButton("X", skin, font)).height(window.getPadTop());
+		TextraWindow window = new TextraWindow("TextraDialog", skin, title);
+		window.getTitleTable().add(new TextraButton("X", skin, window.titleLabel.font)).height(window.getPadTop());
 		window.setPosition(0, 0);
 		window.defaults().spaceBottom(10);
 		window.row().fill().expandX();
@@ -195,7 +202,7 @@ public class TextraShadeUITest extends InputAdapter implements ApplicationListen
 						System.out.println("Chosen: " + object);
 					}
 				}.text("Are you enjoying this demo?").button("Yes", true).button("No", false).key(Keys.ENTER, true)
-					.key(Keys.ESCAPE, false).show(stage);
+						.key(Keys.ESCAPE, false).show(stage);
 			}
 		});
 
@@ -210,8 +217,8 @@ public class TextraShadeUITest extends InputAdapter implements ApplicationListen
 	public void render () {
 		profiler.reset();
 		ScreenUtils.clear(0.2f, 0.2f, 0.2f, 1);
-		
-		fpsLabel.setText("fps: " + Gdx.graphics.getFramesPerSecond() + "...[~]I think[]...");
+
+		fpsLabel.setText("fps: " + Gdx.graphics.getFramesPerSecond() + "...[~]I think[ ]...");
 		fpsLabel.rotateBy(Gdx.graphics.getDeltaTime() * 25f);
 		fpsLabel.pack();
 		passwordLabel.rotateBy(Gdx.graphics.getDeltaTime() * 25f);

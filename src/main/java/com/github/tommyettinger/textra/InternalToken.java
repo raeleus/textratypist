@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 See AUTHORS file.
+ * Copyright (c) 2021-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@
 package com.github.tommyettinger.textra;
 
 enum InternalToken {
-    // @formatter:off
-    // Public
     WAIT("WAIT", TokenCategory.WAIT),
     SPEED("SPEED", TokenCategory.SPEED),
     SLOWER("SLOWER", TokenCategory.SPEED),
@@ -36,10 +34,11 @@ enum InternalToken {
     CLEARFONT("CLEARFONT", TokenCategory.COLOR),
     ENDCOLOR("ENDCOLOR", TokenCategory.COLOR),
     VAR("VAR", TokenCategory.VARIABLE),
+    IF("IF", TokenCategory.IF),
     EVENT("EVENT", TokenCategory.EVENT),
     RESET("RESET", TokenCategory.RESET),
-    SKIP("SKIP", TokenCategory.SKIP);
-    // @formatter:on
+    SKIP("SKIP", TokenCategory.SKIP),
+    UNDO("UNDO", TokenCategory.UNDO);
 
     final String name;
     final TokenCategory category;

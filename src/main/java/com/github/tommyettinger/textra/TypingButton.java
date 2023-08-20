@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,11 +54,13 @@ public class TypingButton extends TextraButton {
 
     @Override
     protected TypingLabel newLabel(String text, Label.LabelStyle style) {
-        return new TypingLabel(text, style);
+        TypingLabel label = new TypingLabel(text, style);
+        return label;
     }
 
     @Override
     protected TypingLabel newLabel(String text, Font font, Color color) {
-        return new TypingLabel(text, font, color);
+        TypingLabel label = new TypingLabel(text, font, color);
+        return label;
     }
 }

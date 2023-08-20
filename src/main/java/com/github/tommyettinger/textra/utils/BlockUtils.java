@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -214,4 +214,7 @@ public class BlockUtils {
             /* ▞ : u259E */ {0, 0, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f},
             /* ▟ : u259F */ {0.5f, 0, 0.5f, 1, 0, 0, 0.5f, 0.5f}
     };
+
+    public static final String ALL_BLOCK_CHARS =
+            "─━│┃┄┅┆┇┈┉┊┋┌┍┎┏┐┑┒┓└┕┖┗┘┙┚┛├┝┞┟┠┡┢┣┤┥┦┧┨┩┪┫┬┭┮┯┰┱┲┳┴┵┶┷┸┹┺┻┼┽┾┿╀╁╂╃╄╅╆╇╈╉╊╋╌╍╎╏═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬╴╵╶╷╸╹╺╻╼╽╾╿▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐▔▕▖▗▘▙▚▛▜▝▞▟";
 }

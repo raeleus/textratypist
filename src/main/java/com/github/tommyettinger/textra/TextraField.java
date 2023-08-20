@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -180,6 +180,18 @@ public class TextraField extends Widget implements Disableable {
 		setSize(getPrefWidth(), getPrefHeight());
 		label.skipToTheEnd(true, true);
 		updateDisplayText();
+	}
+
+	@Override
+	protected void setStage(Stage stage) {
+		super.setStage(stage);
+		label.setStage(stage);
+	}
+
+	@Override
+	protected void setParent(Group parent) {
+		super.setParent(parent);
+		label.setParent(parent);
 	}
 
 	protected void initialize () {
@@ -365,7 +377,7 @@ public class TextraField extends Widget implements Disableable {
 			drawSelection(selection, batch, font, x + bgLeftWidth, y + textY);
 		}
 
-		float yOffset = 0;
+		float yOffset = font.descent;
 		if (label.length() == 0) {
 			if ((!focused || disabled) && messageText != null) {
 				if (style.messageFontColor != null) {
@@ -399,7 +411,7 @@ public class TextraField extends Widget implements Disableable {
 		} else {
 			textY = textY + height * 0.5f;
 		}
-		if (font.integerPosition) textY = (int)textY;
+		if (font.integerPosition) textY = MathUtils.round(textY);
 		return textY;
 	}
 
@@ -469,7 +481,7 @@ public class TextraField extends Widget implements Disableable {
 	public void copy () {
 		if (hasSelection && !passwordMode) {
 			String toCopy = label.substring(Math.min(cursor, selectionStart), Math.max(cursor, selectionStart));
-			System.out.println("Copying: " + toCopy);
+//			System.out.println("Copying: " + toCopy);
 			clipboard.setContents(toCopy);
 		}
 	}
@@ -506,8 +518,9 @@ public class TextraField extends Widget implements Disableable {
 		}
 
 		if (hasSelection) {
-			System.out.println("cursor before: " + cursor);
-			System.out.println("cursor after: " + (cursor = delete(fireChangeEvent)));
+//			System.out.println("cursor before: " + cursor);
+			cursor = delete(fireChangeEvent);
+//			System.out.println("cursor after: " + cursor);
 		}
 		if (fireChangeEvent)
 			changeText(cursor, buffer);
@@ -517,7 +530,7 @@ public class TextraField extends Widget implements Disableable {
 		updateDisplayText();
 		cursor += buffer.length();
 
-		System.out.println("End of paste(): " + label.layout + "\n text: " + text);
+//		System.out.println("End of paste(): " + label.layout + "\n text: " + text);
 	}
 
 	boolean insert(int position, CharSequence inserting) {

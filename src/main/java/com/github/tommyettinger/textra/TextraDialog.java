@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -146,7 +146,7 @@ public class TextraDialog extends TextraWindow {
 
             private void focusChanged(FocusEvent event) {
                 Stage stage = getStage();
-                if (isModal && stage != null && stage.getRoot().getChildren().size > 0
+                if (isModal() && stage != null && stage.getRoot().getChildren().size > 0
                         && stage.getRoot().getChildren().peek() == TextraDialog.this) { // TextraDialog is top most actor.
                     Actor newFocusedActor = event.getRelatedActor();
                     if (newFocusedActor != null && !newFocusedActor.isDescendantOf(TextraDialog.this)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 See AUTHORS file.
+ * Copyright (c) 2021-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ public class TypingConfig {
     public static int CHAR_LIMIT_PER_FRAME = -1;
 
     /**
-     * Default color for the {@code CLEARCOLOR} token. Can be overriden by {@link TypingLabel#getClearColor()}.
+     * Default color for the {@code CLEARCOLOR} token. Can be overridden by {@link TypingLabel#getClearColor()}.
      */
     public static Color DEFAULT_CLEAR_COLOR = new Color(Color.WHITE);
 
@@ -72,14 +72,49 @@ public class TypingConfig {
     public static final ObjectMap<String, String> GLOBAL_VARS = new ObjectMap<>();
 
     /**
+     * Defines several default variables with names in {@code ALLCAPS} with no separators, all of them creating effects
+     * with complex parameters or combining multiple effects. The variables this defines:
+     * <ul>
+     *     <li><code>{VAR=FIRE}</code> changes the following text to have fiery changing colors. You can end it with
+     *     <code>{VAR=ENDFIRE}</code>.</li>
+     *     <li><code>{VAR=SPUTTERINGFIRE}</code> changes the following text to have fiery changing colors and resize
+     *     like popping flames. You can end it with <code>{VAR=ENDSPUTTERINGFIRE}</code>.</li>
+     *     <li><code>{VAR=BLIZZARD}</code> changes the following text to waver in the wind and use icy colors,
+     *     white to light blue. You can end it with <code>{VAR=ENDBLIZZARD}</code>.</li>
+     *     <li><code>{VAR=SHIVERINGBLIZZARD}</code> changes the following text to waver in the wind and use icy
+     *     colors, white to light blue, plus it will randomly make glyphs "shiver" as if cold. You can end it with
+     *     <code>{VAR=ENDSHIVERINGBLIZZARD}</code>.</li>
+     *     <li><code>{VAR=ELECTRIFY}</code> changes the following text to be a dull gray purple color and randomly
+     *     makes glyphs turn light yellow and vibrate around. You can end it with <code>{VAR=ENDELECTRIFY}</code>.</li>
+     *     <li><code>{VAR=ZOMBIE}</code> changes the following text to be "dark olive sage" (a dull gray-green
+     *     color), makes glyphs rotate left and right slowly and randomly, makes glyphs drop down and get back up
+     *     randomly, and when they first appear, has the glyphs emerge from the baseline (as if clawing out of a grave).
+     *     You can end it with <code>{VAR=ENDZOMBIE}</code>.</li>
+     * </ul>
+     */
+    public static void initializeGlobalVars() {
+        TypingConfig.GLOBAL_VARS.put("FIRE", "{OCEAN=0.7;1.25;0.11;1.0;0.65}");
+        TypingConfig.GLOBAL_VARS.put("ENDFIRE", "{ENDOCEAN}");
+        TypingConfig.GLOBAL_VARS.put("SPUTTERINGFIRE", "{OCEAN=0.7;1.25;0.11;1.0;0.65}{SPUTTER=0.2;0.25;4;inf}");
+        TypingConfig.GLOBAL_VARS.put("ENDSPUTTERINGFIRE", "{ENDOCEAN}{ENDSPUTTER}");
+        TypingConfig.GLOBAL_VARS.put("BLIZZARD", "{GRADIENT=88ccff;eef8ff;-0.5;5}{WIND=2;4;0.25;0.1}");
+        TypingConfig.GLOBAL_VARS.put("ENDBLIZZARD", "{ENDGRADIENT}{ENDWIND}");
+        TypingConfig.GLOBAL_VARS.put("SHIVERINGBLIZZARD", "{GRADIENT=88ccff;eef8ff;-0.5;5}{WIND=2;4;0.25;0.1}{JOLT=1;0.6;inf;0.1;;}");
+        TypingConfig.GLOBAL_VARS.put("ENDSHIVERINGBLIZZARD", "{ENDGRADIENT}{ENDWIND}{ENDJOLT}");
+        TypingConfig.GLOBAL_VARS.put("ELECTRIFY", "{JOLT=1;1.2;inf;0.3;dull lavender;light butter}");
+        TypingConfig.GLOBAL_VARS.put("ENDELECTRIFY", "{ENDJOLT}");
+        TypingConfig.GLOBAL_VARS.put("ZOMBIE", "{SICK=0.4}{CROWD}{EMERGE=0.1}[dark olive sage]");
+        TypingConfig.GLOBAL_VARS.put("ENDZOMBIE", "{ENDSICK}{ENDCROWD}{ENDEMERGE}{CLEARCOLOR}");
+    }
+    /**
      * Map of start tokens and their effect classes. Internal use only.
      */
-    static final OrderedMap<String, Class<? extends Effect>> EFFECT_START_TOKENS = new OrderedMap<>();
+    static final OrderedMap<String, Effect.EffectBuilder> EFFECT_START_TOKENS = new OrderedMap<>();
 
     /**
      * Map of end tokens and their effect classes. Internal use only.
      */
-    static final OrderedMap<String, Class<? extends Effect>> EFFECT_END_TOKENS = new OrderedMap<>();
+    static final OrderedMap<String, Effect.EffectBuilder> EFFECT_END_TOKENS = new OrderedMap<>();
 
     /**
      * Whether effect tokens are dirty and need to be recalculated.
@@ -90,12 +125,13 @@ public class TypingConfig {
      * Registers a new effect to TypingLabel.
      *
      * @param startTokenName Name of the token that starts the effect, such as WAVE.
-     * @param endTokenName   Name of the token that ends the effect, such as ENDWAVE.
-     * @param effectClass    Class of the effect, such as WaveEffect.class.
+     * @param builder        Typically a lambda or method reference that creates an Effect.
      */
-    public static void registerEffect(String startTokenName, String endTokenName, Class<? extends Effect> effectClass) {
-        EFFECT_START_TOKENS.put(startTokenName.toUpperCase(), effectClass);
-        EFFECT_END_TOKENS.put(endTokenName.toUpperCase(), effectClass);
+    public static void registerEffect(String startTokenName, Effect.EffectBuilder builder) {
+        final String name = startTokenName.toUpperCase();
+        final Effect.EffectBuilder b = (label, params) -> builder.produce(label, params).assignTokenName(name);
+        EFFECT_START_TOKENS.put(name, b);
+        EFFECT_END_TOKENS.put("END"+name, b);
         dirtyEffectMaps = true;
     }
 
@@ -103,11 +139,11 @@ public class TypingConfig {
      * Unregisters an effect from TypingLabel.
      *
      * @param startTokenName Name of the token that starts the effect, such as WAVE.
-     * @param endTokenName   Name of the token that ends the effect, such as ENDWAVE.
      */
-    public static void unregisterEffect(String startTokenName, String endTokenName) {
-        EFFECT_START_TOKENS.remove(startTokenName.toUpperCase());
-        EFFECT_END_TOKENS.remove(endTokenName.toUpperCase());
+    public static void unregisterEffect(String startTokenName) {
+        String name = startTokenName.toUpperCase();
+        EFFECT_START_TOKENS.remove(name);
+        EFFECT_END_TOKENS.remove("END"+name);
         dirtyEffectMaps = true;
     }
 
@@ -122,33 +158,38 @@ public class TypingConfig {
         INTERVAL_MULTIPLIERS_BY_CHAR.put('\n', 2.5f);
 
         // Register default tokens
-        registerEffect("EASE", "ENDEASE", EaseEffect.class);
-        registerEffect("HANG", "ENDHANG", HangEffect.class);
-        registerEffect("JUMP", "ENDJUMP", JumpEffect.class);
-        registerEffect("SHAKE", "ENDSHAKE", ShakeEffect.class);
-        registerEffect("SICK", "ENDSICK", SickEffect.class);
-        registerEffect("SLIDE", "ENDSLIDE", SlideEffect.class);
-        registerEffect("WAVE", "ENDWAVE", WaveEffect.class);
-        registerEffect("WIND", "ENDWIND", WindEffect.class);
-        registerEffect("RAINBOW", "ENDRAINBOW", RainbowEffect.class);
-        registerEffect("GRADIENT", "ENDGRADIENT", GradientEffect.class);
-        registerEffect("FADE", "ENDFADE", FadeEffect.class);
-        registerEffect("BLINK", "ENDBLINK", BlinkEffect.class);
-        registerEffect("JOLT", "ENDJOLT", JoltEffect.class);
-        registerEffect("SPIRAL", "ENDSPIRAL", SpiralEffect.class);
-        registerEffect("SPIN", "ENDSPIN", SpinEffect.class);
-        registerEffect("CROWD", "ENDCROWD", CrowdEffect.class);
-        registerEffect("SHRINK", "ENDSHRINK", ShrinkEffect.class);
-        registerEffect("EMERGE", "ENDEMERGE", EmergeEffect.class);
-        registerEffect("HEARTBEAT", "ENDHEARTBEAT", HeartbeatEffect.class);
-        registerEffect("CAROUSEL", "ENDCAROUSEL", CarouselEffect.class);
-        registerEffect("SQUASH", "ENDSQUASH", SquashEffect.class);
-        registerEffect("SCALE", "ENDSCALE", ScaleEffect.class);
-        registerEffect("ROTATE", "ENDROTATE", RotateEffect.class);
-        registerEffect("HIGHLIGHT", "ENDHIGHLIGHT", HighlightEffect.class);
-        registerEffect("LINK", "ENDLINK", LinkEffect.class);
-        registerEffect("TRIGGER", "ENDTRIGGER", TriggerEffect.class);
-        registerEffect("ATTENTION", "ENDATTENTION", AttentionEffect.class);
-        registerEffect("STYLIST", "ENDSTYLIST", StylistEffect.class);
+        registerEffect("EASE", EaseEffect::new);
+        registerEffect("HANG", HangEffect::new);
+        registerEffect("JUMP", JumpEffect::new);
+        registerEffect("SHAKE", ShakeEffect::new);
+        registerEffect("SICK", SickEffect::new);
+        registerEffect("SLIDE", SlideEffect::new);
+        registerEffect("WAVE", WaveEffect::new);
+        registerEffect("WIND", WindEffect::new);
+        registerEffect("RAINBOW", RainbowEffect::new);
+        registerEffect("GRADIENT", GradientEffect::new);
+        registerEffect("FADE", FadeEffect::new);
+        registerEffect("BLINK", BlinkEffect::new);
+        registerEffect("JOLT", JoltEffect::new);
+        registerEffect("SPIRAL", SpiralEffect::new);
+        registerEffect("SPIN", SpinEffect::new);
+        registerEffect("CROWD", CrowdEffect::new);
+        registerEffect("SHRINK", ShrinkEffect::new);
+        registerEffect("EMERGE", EmergeEffect::new);
+        registerEffect("HEARTBEAT", HeartbeatEffect::new);
+        registerEffect("CAROUSEL", CarouselEffect::new);
+        registerEffect("SQUASH", SquashEffect::new);
+        registerEffect("SCALE", ScaleEffect::new);
+        registerEffect("ROTATE", RotateEffect::new);
+        registerEffect("HIGHLIGHT", HighlightEffect::new);
+        registerEffect("LINK", LinkEffect::new);
+        registerEffect("TRIGGER", TriggerEffect::new);
+        registerEffect("ATTENTION", AttentionEffect::new);
+        registerEffect("STYLIST", StylistEffect::new);
+        registerEffect("CANNON", CannonEffect::new);
+        registerEffect("OCEAN", OceanEffect::new);
+        registerEffect("SPUTTER", SputterEffect::new);
+
+        initializeGlobalVars();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -142,7 +142,7 @@ public class TypingDialog extends TypingWindow {
 
             private void focusChanged(FocusEvent event) {
                 Stage stage = getStage();
-                if (isModal && stage != null && stage.getRoot().getChildren().size > 0
+                if (isModal() && stage != null && stage.getRoot().getChildren().size > 0
                         && stage.getRoot().getChildren().peek() == TypingDialog.this) { // TypingDialog is top most actor.
                     Actor newFocusedActor = event.getRelatedActor();
                     if (newFocusedActor != null && !newFocusedActor.isDescendantOf(TypingDialog.this)

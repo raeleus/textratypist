@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,12 +43,12 @@ public class TextraWindow extends Table {
     static private final int MOVE = 1 << 5;
 
     private WindowStyle style;
-    boolean isMovable = true, isModal, isResizable;
-    int resizeBorder = 8;
-    boolean keepWithinStage = true;
-    TextraLabel titleLabel;
-    Table titleTable;
-    boolean drawTitleTable;
+    private boolean isMovable = true, isModal, isResizable;
+    private int resizeBorder = 8;
+    private boolean keepWithinStage = true;
+    protected TextraLabel titleLabel;
+    protected Table titleTable;
+    protected boolean drawTitleTable;
 
     protected int edge;
     protected boolean dragging;
@@ -83,24 +83,53 @@ public class TextraWindow extends Table {
         setSkin(skin);
     }
 
-    public TextraWindow(String title, WindowStyle style, Font replacementFont) {
+
+    public TextraWindow(String title, Skin skin, String styleName, Font replacementFont, boolean scaleTitleFont) {
+        this(title, skin.get(styleName, WindowStyle.class), replacementFont, scaleTitleFont);
+        setSkin(skin);
+    }
+
+    public TextraWindow(String title, WindowStyle style, Font replacementFont){
+        this(title, style, replacementFont, false);
+    }
+
+    /**
+     *
+     * @param title the text that will go in the title bar
+     * @param style a WindowStyle typically pulled from a Skin
+     * @param replacementFont a Font that will be used for at least the title text, in place of the style's font
+     * @param scaleTitleFont if true, this will attempt to change replacementFont to fit the title bar; you may want to copy replacementFont if you need it unscaled elsewhere
+     */
+    public TextraWindow(String title, WindowStyle style, Font replacementFont, boolean scaleTitleFont) {
         if (title == null) throw new IllegalArgumentException("title cannot be null.");
+        if (replacementFont == null) throw new IllegalArgumentException("replacementFont cannot be null.");
         setTouchable(Touchable.enabled);
         setClip(true);
 
         titleLabel = newLabel(title, replacementFont, style.titleFontColor);
-        font = titleLabel.getFont();
-        titleLabel.layout.ellipsis = "...";
+        setStyle(style, replacementFont);
 
+        font = replacementFont;
+        if(scaleTitleFont) {
+            float ratio = getBackground().getTopHeight() / replacementFont.cellHeight;
+            Font labelFont = new Font(replacementFont);
+            labelFont.scale(ratio, ratio);
+            labelFont.descent *= ratio;
+            titleLabel.setFont(labelFont);
+        }
+        else {
+            titleLabel.setFont(font);
+        }
         titleTable = new Table() {
             public void draw(Batch batch, float parentAlpha) {
                 if (drawTitleTable) super.draw(batch, parentAlpha);
             }
         };
         titleTable.add(titleLabel).expandX().fillX().minWidth(0);
+        titleLabel.layout.ellipsis = "...";
+
         addActor(titleTable);
 
-        setStyle(style, replacementFont);
         setWidth(150);
         setHeight(150);
 
@@ -363,6 +392,10 @@ public class TextraWindow extends Table {
 
     public void setResizable(boolean isResizable) {
         this.isResizable = isResizable;
+    }
+
+    public int getResizeBorder() {
+        return resizeBorder;
     }
 
     public void setResizeBorder(int resizeBorder) {

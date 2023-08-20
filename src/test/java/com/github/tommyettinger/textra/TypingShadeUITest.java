@@ -22,7 +22,6 @@ import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
-import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.profiling.GLProfiler;
@@ -63,12 +62,17 @@ public class TypingShadeUITest extends InputAdapter implements ApplicationListen
 		TextureRegion imageFlipped = new TextureRegion(image);
 		imageFlipped.flip(true, true);
 		TextureRegion image2 = new TextureRegion(texture2);
-		final Font font = new Font(skin.get(Label.LabelStyle.class).font)
+		final Font font = new Font(skin.get(Label.LabelStyle.class).font, 0f, 0f, 0f, 0f)
 //				.adjustLineHeight(0.75f)
 				.useIntegerPositions(true);
-		KnownFonts.addEmoji(font);
+		// For unknown reasons, emoji added to this particular font default to being offset by a full emoji width (32)
+		// on x, and a quarter-emoji width on height (probably because we adjusted line height to 1.25x).
+		// Using the extra three float arguments for offsetX, offsetY, and xAdvance changes helps a lot here.
+		KnownFonts.addEmoji(font, -32f, 4f, 0f);
+		final Font title = new Font(skin.get("title", Label.LabelStyle.class).font, 0, 2, 0, 0)
+//				.adjustLineHeight(1.5f)
+				.useIntegerPositions(true);
 
-		// stage = new Stage(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false, new PolygonSpriteBatch());
 		stage = new Stage(new ScreenViewport());
 		Gdx.input.setInputProcessor(stage);
 
@@ -83,7 +87,7 @@ public class TypingShadeUITest extends InputAdapter implements ApplicationListen
 		Button imgButton = new Button(new Image(image), skin);
 		Button imgToggleButton = new Button(new Image(image), skin, "toggle");
 
-		TypingLabel myLabel = new TypingLabel("This is some text.", skin, "title");
+		TypingLabel myLabel = new TypingLabel("This is some text.", skin, "title", title);
 
 		Table t = new Table();
 		t.row();
@@ -121,22 +125,22 @@ public class TypingShadeUITest extends InputAdapter implements ApplicationListen
 		// list.getSelection().setToggle(true);
 		ScrollPane scrollPane2 = new ScrollPane(list, skin);
 		scrollPane2.setFlickScroll(false);
-		TypingLabel minSizeLabel = new TypingLabel("minWidth cell", skin, "title"); // demos SplitPane respecting widget's minWidth
+		TypingLabel minSizeLabel = new TypingLabel("minWidth cell", skin, "title", title); // demos SplitPane respecting widget's minWidth
 		Table rightSideTable = new Table(skin);
 		rightSideTable.add(minSizeLabel).growX().row();
 		rightSideTable.add(scrollPane2).grow();
 		SplitPane splitPane = new SplitPane(scrollPane, rightSideTable, false, skin, "default-horizontal");
-		fpsLabel = new TypingLabel("fps: 0    [^][SKY][[citation needed]", skin, "title");
+		fpsLabel = new TypingLabel("fps: 0    [^][SKY][[citation needed]", skin, "title", title);
 		fpsLabel.setAlignment(Align.topLeft);
 		// configures an example of a TextField in password mode.
-		passwordLabel = new TypingLabel("Textfield in [~]secure[] password mode [+ninja][+ninja][+ninja]: ", skin, "title", font);
+		passwordLabel = new TypingLabel("Textfield in [~]secure[ ] password mode [+ninja][+ninja][+ninja]: ", skin, "title", font);
 		final TextField passwordTextField = new TextField("", skin);
 		passwordTextField.setMessageText("password");
 		passwordTextField.setPasswordCharacter('*');
 		passwordTextField.setPasswordMode(true);
 
 		// window.debug();
-		TextraWindow window = new TextraWindow("TextraDialog", skin);
+		TextraWindow window = new TextraWindow("TextraDialog", skin, title);
 		window.getTitleTable().add(new TextraButton("X", skin, font)).height(window.getPadTop());
 		window.setPosition(0, 0);
 		window.defaults().spaceBottom(10);
@@ -242,10 +246,10 @@ public class TypingShadeUITest extends InputAdapter implements ApplicationListen
 	public static void main(String[] args){
 		Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
 		config.setTitle("TypingLabel UI test");
-		config.setWindowedMode(640, 540);
+		config.setWindowedMode(640, 575);
 		config.disableAudio(true);
 //		config.setForegroundFPS(Lwjgl3ApplicationConfiguration.getDisplayMode().refreshRate);
-		config.useVsync(true);
+		config.useVsync(false);
 		config.setForegroundFPS(0);
 		new Lwjgl3Application(new TypingShadeUITest(), config);
 	}

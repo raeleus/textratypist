@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,9 +65,9 @@ public class TextraCheckBox extends TextraButton {
         image = newImage();
         image.setDrawable(style.checkboxOff);
 
-        clearChildren();
-        imageCell = add(image);
-        add(label);
+        addActorBefore(image, label);
+        imageCell = getCell(image);
+        pack();
         setSize(getPrefWidth(), getPrefHeight());
     }
 

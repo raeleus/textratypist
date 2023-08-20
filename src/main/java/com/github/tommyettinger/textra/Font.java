@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 See AUTHORS file.
+ * Copyright (c) 2021-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,8 +148,8 @@ public class Font implements Disposable {
          * @param width         the width of the GlyphRegion, in pixels
          * @param height        the height of the GlyphRegion, in pixels
          */
-        public GlyphRegion(TextureRegion textureRegion, int x, int y, int width, int height) {
-            super(textureRegion, x, y, width, height);
+        public GlyphRegion(TextureRegion textureRegion, float x, float y, float width, float height) {
+            super(textureRegion, Math.round(x), Math.round(y), Math.round(width), Math.round(height));
             offsetX = 0f;
             offsetY = 0f;
             xAdvance = width;
@@ -302,7 +302,7 @@ public class Font implements Disposable {
                 fontAliases.put(String.valueOf(i), i);
             }
         }
-        
+
         public FontFamily(Skin skin) {
             ObjectMap<String, BitmapFont> map = skin.getAll(BitmapFont.class);
             Array<String> keys = map.keys().toArray();
@@ -376,7 +376,7 @@ public class Font implements Disposable {
     /**
      * Maps char keys (stored as ints) to their corresponding {@link GlyphRegion} values. You can add arbitrary images
      * to this mapping if you create appropriate GlyphRegion values (as with
-     * {@link GlyphRegion#GlyphRegion(TextureRegion, int, int, int, int)}), though they must map to a char.
+     * {@link GlyphRegion#GlyphRegion(TextureRegion, float, float, float, float)}), though they must map to a char.
      */
     public IntMap<GlyphRegion> mapping;
 
@@ -421,10 +421,10 @@ public class Font implements Disposable {
      * Unlikely to be used externally, this is one way of storing the kerning information that some fonts have. Kerning
      * can improve the appearance of variable-width fonts, and is always null for monospace fonts. This uses a
      * combination of two chars as a key (the earlier char is in the upper 16 bits, and the later char is in the lower
-     * 16 bits). Each such combination that has a special kerning value (not the default 0) has an int associated with
+     * 16 bits). Each such combination that has a special kerning value (not the default 0) has a float associated with
      * it, which applies to the x-position of the later char.
      */
-    public IntIntMap kerning;
+    public IntFloatMap kerning;
     /**
      * When {@link #distanceField} is {@link DistanceFieldType#SDF} or {@link DistanceFieldType#MSDF}, this determines
      * how much the edges of the glyphs should be aliased sharply (higher values) or anti-aliased softly (lower values).
@@ -484,7 +484,7 @@ public class Font implements Disposable {
      * tiny solid block in the lower-right corner and use that for this purpose. You can check if a .fnt file has a
      * solid block present by searching for {@code char id=9608} (9608 is the decimal way to write 0x2588).
      */
-    public char solidBlock = '\u2588'; // in decimal, this is 9608
+    public char solidBlock = '█'; // in decimal, this is 9608, in hex, u2588
 
     /**
      * If non-null, may contain connected Font values and names/aliases to look them up with using [@Name] syntax.
@@ -496,13 +496,36 @@ public class Font implements Disposable {
      */
     public ColorLookup colorLookup = ColorLookup.DESCRIPTIVE;
 
-    /**
+    /*
      * If true, this will always use integers for x and y position (rounding), which can help some fonts look more
      * clear. However, if your world units are measured so that one world unit covers several pixels, then having this
      * enabled can cause bizarre-looking visual glitches involving stretched or disappearing glyphs. This defaults to
      * false, unlike what libGDX BitmapFont defaults to.
      */
+    /**
+     * By default, this doesn't do anything; subclasses can override {@link #handleIntegerPosition(float)} to try to do
+     * something different with it. BitmapFont in libGDX defaults to having integer positions enabled, and there they
+     * actually do something (lock the font positions to integer world units). When world units aren't equivalent to
+     * on-screen pixels, BitmapFont's behavior leads to severe glitches in font appearance, so usually we aren't missing
+     * much by not using this behavior.
+     */
     public boolean integerPosition = false;
+
+    /**
+     * A multiplier that applies to the horizontal movement associated with oblique text (which is similar to italic).
+     * The default is 1.0f, which is fairly strong for some fonts, and some styles look better with a smaller value.
+     * A value of 0.0f will make oblique text look like regular text. A negative value will tip the angle backwards, so
+     * the top will be to the left of the bottom.
+     */
+    public float obliqueStrength = 1f;
+
+    /**
+     * A multiplier that applies to the distance bold text will stretch away from the original glyph outline. The bold
+     * effect is achieved here by drawing the same GlyphRegion multiple times, separated to the left and right by a
+     * small distance. By reducing boldStrength to between 0.0 and 1.0, you can reduce the weight of bold text, but
+     * increasing boldStrength does not usually work well.
+     */
+    public float boldStrength = 1f;
 
     /**
      * The name of the Font, for display purposes. This is not necessarily the same as the name of the font used in any
@@ -585,12 +608,18 @@ public class Font implements Disposable {
      * Bit flag for black outline mode, as a long.
      * This only has its intended effect if alternate mode is enabled.
      * This can overlap with {@link #SMALL_CAPS}, but cannot be used at the same time as scaling.
+     * This can be configured to use a different color in place of black by changing {@link #PACKED_BLACK}.
      */
     public static final long BLACK_OUTLINE = 2L << 20 | ALTERNATE;
     /**
      * Bit flag for white outline mode, as a long.
      * This only has its intended effect if alternate mode is enabled.
+     * If the Font being outlined uses some other color in its texture, this will draw the outline in the color used by
+     * the outer edge of each glyph drawn. For images in an atlas, like {@link KnownFonts#addEmoji(Font)}, this will
+     * typically color the outline in the same color used by the edge of the image. This can be avoided by tinting the
+     * glyph with a darker color and still using this white outline.
      * This can overlap with {@link #SMALL_CAPS}, but cannot be used at the same time as scaling.
+     * This can be configured to use a different color in place of white by changing {@link #PACKED_WHITE}.
      */
     public static final long WHITE_OUTLINE = 4L << 20 | ALTERNATE;
     /**
@@ -609,24 +638,233 @@ public class Font implements Disposable {
      * Bit flag for error mode, shown as a red wiggly-underline, as a long.
      * This only has its intended effect if alternate mode is enabled.
      * This can overlap with {@link #SMALL_CAPS}, but cannot be used at the same time as scaling.
+     * This can be configured to use a different color in place of red by changing {@link #PACKED_ERROR_COLOR}.
      */
     public static final long ERROR = 10L << 20 | ALTERNATE;
     /**
      * Bit flag for warning mode, shown as a yellow barred-underline, as a long.
      * This only has its intended effect if alternate mode is enabled.
      * This can overlap with {@link #SMALL_CAPS}, but cannot be used at the same time as scaling.
+     * This can be configured to use a different color in place of yellow by changing {@link #PACKED_WARN_COLOR}.
      */
     public static final long WARN = 12L << 20 | ALTERNATE;
     /**
      * Bit flag for note mode, shown as a blue wavy-underline, as a long.
      * This only has its intended effect if alternate mode is enabled.
      * This can overlap with {@link #SMALL_CAPS}, but cannot be used at the same time as scaling.
+     * This can be configured to use a different color in place of blue by changing {@link #PACKED_NOTE_COLOR}.
      */
     public static final long NOTE = 14L << 20 | ALTERNATE;
 
+    /**
+     * The color black, as a packed float using the default RGBA color space.
+     * This can be overridden by subclasses that either use a different color space,
+     * or want to use a different color in place of black for effects like {@link #BLACK_OUTLINE}.
+     */
+    public float PACKED_BLACK = NumberUtils.intBitsToFloat(0xFE000000);
+    /**
+     * The color white, as a packed float using the default RGBA color space.
+     * This can be overridden by subclasses that either use a different color space,
+     * or want to use a different color in place of white for effects like {@link #WHITE_OUTLINE} and {@link #SHINY}.
+     */
+    public float PACKED_WHITE = Color.WHITE_FLOAT_BITS;
+    /**
+     * The color to use for {@link #ERROR}'s underline, as a packed float using the default RGBA color space.
+     * This can be overridden by subclasses that either use a different color space,
+     * or want to use a different color in place of red for {@link #ERROR}.
+     * In RGBA8888 format, this is the color {@code 0xFF0000FF}.
+     * You can generate packed float colors using {@link Color#toFloatBits} or {@link NumberUtils#intToFloatColor(int)},
+     * among other methods. Make sure that the order the method expects RGBA channels is what you provide.
+     */
+    public float PACKED_ERROR_COLOR = -0x1.0001fep125F; // red
+    /**
+     * The color to use for {@link #WARN}'s underline, as a packed float using the default RGBA color space.
+     * This can be overridden by subclasses that either use a different color space,
+     * or want to use a different color in place of yellow for {@link #WARN}.
+     * In RGBA8888 format, this is the color {@code 0xFFD510FF}.
+     * You can generate packed float colors using {@link Color#toFloatBits} or {@link NumberUtils#intToFloatColor(int)},
+     * among other methods. Make sure that the order the method expects RGBA channels is what you provide.
+     */
+    public float PACKED_WARN_COLOR = -0x1.21abfep125F; // yellow
+    /**
+     * The color to use for {@link #NOTE}'s underline, as a packed float using the default RGBA color space.
+     * This can be overridden by subclasses that either use a different color space,
+     * or want to use a different color in place of blue for {@link #NOTE}.
+     * In RGBA8888 format, this is the color {@code 0x3088B8FF}.
+     * You can generate packed float colors using {@link Color#toFloatBits} or {@link NumberUtils#intToFloatColor(int)},
+     * among other methods. Make sure that the order the method expects RGBA channels is what you provide.
+     */
+    public float PACKED_NOTE_COLOR = -0x1.71106p126F; // blue
+
+    /**
+     * The color to use for {@link #DROP_SHADOW}, as a packed float using the default RGBA color space.
+     * This can be overridden by subclasses that either use a different color space,
+     * or want to use a different color in place of half-transparent dark gray for {@link #DROP_SHADOW}.
+     * In RGBA8888 format, this is the color {@code 0x2121217E}.
+     * You can generate packed float colors using {@link Color#toFloatBits} or {@link NumberUtils#intToFloatColor(int)},
+     * among other methods. Make sure that the order the method expects RGBA channels is what you provide.
+     */
+    public float PACKED_SHADOW_COLOR = 0x1.424242p125F; // half-transparent dark gray
+    //Color.toFloatBits(0.1333f, 0.1333f, 0.1333f, 0.5f);
+
+    /**
+     * The x-adjustment this Font was initialized with, or 0 if there was none given.
+     * This is not meant to affect appearance after a Font has been constructed, but is meant to allow
+     * some introspection into what values a Font was given at construction-time.
+     */
+    public float xAdjust;
+    /**
+     * The y-adjustment this Font was initialized with, or 0 if there was none given.
+     * This is not meant to affect appearance after a Font has been constructed, but is meant to allow
+     * some introspection into what values a Font was given at construction-time.
+     */
+    public float yAdjust;
+    /**
+     * The width-adjustment this Font was initialized with, or 0 if there was none given.
+     * This is not meant to affect appearance after a Font has been constructed, but is meant to allow
+     * some introspection into what values a Font was given at construction-time.
+     */
+    public float widthAdjust;
+    /**
+     * The height-adjustment this Font was initialized with, or 0 if there was none given.
+     * This is not meant to affect appearance after a Font has been constructed, but is meant to allow
+     * some introspection into what values a Font was given at construction-time.
+     */
+    public float heightAdjust;
+
+    /**
+     * Precise adjustment for the underline's x-position, affecting the left side of the underline.
+     * Normally, because underlines continue into any underline for the next glyph, decreasing
+     * underX should be accompanied by increasing {@link #underLength} by a similar amount.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float underX;
+    /**
+     * Precise adjustment for the underline's y-position, affecting the bottom side of the underline.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float underY;
+    /**
+     * Precise adjustment for the underline's x-size, affecting the extra underline drawn to the right
+     * of the underline. Normally, because underlines continue into any underline for the next glyph,
+     * decreasing {@link #underX} should be accompanied by increasing underLength by a similar amount.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float underLength;
+    /**
+     * Precise adjustment for the underline's y-size, affecting how thick the underline is from bottom
+     * to top.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float underBreadth;
+    /**
+     * Precise adjustment for the strikethrough's x-position, affecting the left side of the strikethrough.
+     * Normally, because strikethrough continues into any strikethrough for the next glyph, decreasing
+     * strikeX should be accompanied by increasing {@link #strikeLength} by a similar amount.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float strikeX;
+    /**
+     * Precise adjustment for the strikethrough's y-position, affecting the bottom side of the strikethrough.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float strikeY;
+    /**
+     * Precise adjustment for the strikethrough's x-size, affecting the extra strikethrough drawn to the right
+     * of the strikethrough. Normally, because strikethrough continues into any strikethrough for the next glyph,
+     * decreasing {@link #strikeX} should be accompanied by increasing strikeLength by a similar amount.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float strikeLength;
+    /**
+     * Precise adjustment for the strikethrough's y-size, affecting how thick the strikethrough is from bottom
+     * to top.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float strikeBreadth;
+    /**
+     * Precise adjustment for the x-position of "fancy lines" such as error, warning, and note effects, affecting the
+     * left side of the line.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float fancyX;
+    /**
+     * Precise adjustment for the y-position of "fancy lines" such as error, warning, and note effects, affecting the
+     * bottom side of the line.
+     * <br>
+     * This is a "Zen" metric, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and only affects one value.
+     */
+    public float fancyY;
+
+    /**
+     * An adjustment added to the {@link GlyphRegion#offsetX} of any inline images added with
+     * {@link #addAtlas(TextureAtlas, String, String, float, float, float)} (or its overloads).
+     * This is meant as a guess for how square inline images, such as {@link KnownFonts#addEmoji(Font) emoji}, may need
+     * to be moved around to fit correctly on a line. If you have multiple atlases added to one font, you should
+     * probably use the {@link #addAtlas(TextureAtlas, float, float, float)} overload that allows adding additional
+     * adjustments if one atlas isn't quite right.
+     * <br>
+     * Changing offsetXChange with a positive value moves all GlyphRegions to the right.
+     */
+    public float inlineImageOffsetX = 0f;
+    /**
+     * An adjustment added to the {@link GlyphRegion#offsetY} of any inline images added with
+     * {@link #addAtlas(TextureAtlas, String, String, float, float, float)} (or its overloads).
+     * This is meant as a guess for how square inline images, such as {@link KnownFonts#addEmoji(Font) emoji}, may need
+     * to be moved around to fit correctly on a line. If you have multiple atlases added to one font, you should
+     * probably use the {@link #addAtlas(TextureAtlas, float, float, float)} overload that allows adding additional
+     * adjustments if one atlas isn't quite right.
+     * <br>
+     * Changing offsetYChange with a positive value moves all GlyphRegions down (this is possibly unexpected).
+     */
+    public float inlineImageOffsetY = 0f;
+    /**
+     * An adjustment added to the {@link GlyphRegion#xAdvance} of any inline images added with
+     * {@link #addAtlas(TextureAtlas, String, String, float, float, float)} (or its overloads).
+     * This is meant as a guess for how square inline images, such as {@link KnownFonts#addEmoji(Font) emoji}, may need
+     * to be moved around to fit correctly on a line. If you have multiple atlases added to one font, you should
+     * probably use the {@link #addAtlas(TextureAtlas, float, float, float)} overload that allows adding additional
+     * adjustments if one atlas isn't quite right.
+     * <br>
+     * Changing xAdvanceChange with a positive value will shrink all GlyphRegions (this is probably unexpected).
+     */
+    public float inlineImageXAdvance = 0f;
+
+    /**
+     * If true (the default), any text inside matching curly braces, plus the curly braces themselves, will be ignored,
+     * not stored in Line or Layout, and not displayed. If false, curly braces and their contents are treated as normal
+     * text.
+     */
+    public boolean omitCurlyBraces = true;
+    /**
+     * If true (the default), square bracket markup functions as documented in {@link #markup(String, Layout)}. If
+     * false, square brackets and their contents are treated as normal text.
+     */
+    public boolean enableSquareBrackets = true;
+
     private final float[] vertices = new float[20];
-    private final Layout tempLayout = Layout.POOL.obtain();
+    private final Layout tempLayout = new Layout();
     private final LongArray glyphBuffer = new LongArray(128);
+    private final LongArray historyBuffer = new LongArray(64);
     /**
      * Must be in lexicographic order because we use {@link Arrays#binarySearch(char[], int, int, char)} to
      * verify if a char is present.
@@ -692,32 +930,81 @@ public class Font implements Disposable {
             + "	v_texCoords = " + ShaderProgram.TEXCOORD_ATTRIBUTE + "0;\n"
             + "	gl_Position =  u_projTrans * " + ShaderProgram.POSITION_ATTRIBUTE + ";\n"
             + "}\n";
+    public static final String sdfFragmentShader =
+            "#ifdef GL_ES\n"
+                    + "	precision mediump float;\n"
+                    + "	precision mediump int;\n"
+                    + "#endif\n"
+                    + "\n"
+                    + "uniform sampler2D u_texture;\n"
+                    + "uniform float u_smoothing;\n"
+                    + "varying vec4 v_color;\n"
+                    + "varying vec2 v_texCoords;\n"
+                    + "\n"
+                    + "void main() {\n"
+                    + "	if (u_smoothing > 0.0) {\n"
+                    + "		float smoothing = 0.25 / u_smoothing;\n"
+                    + "		vec4 color = texture2D(u_texture, v_texCoords);\n"
+                    + "		float alpha = smoothstep(0.5 - smoothing, 0.5 + smoothing, color.a);\n"
+                    + "		gl_FragColor = vec4(v_color.rgb * color.rgb, alpha * v_color.a);\n"
+                    + "	} else {\n"
+                    + "		gl_FragColor = v_color * texture2D(u_texture, v_texCoords);\n"
+                    + "	}\n"
+                    + "}\n";
 
     /**
      * Fragment shader source meant for MSDF fonts. This is automatically used when {@link #enableShader(Batch)} is
      * called and the {@link #distanceField} is {@link DistanceFieldType#MSDF}.
+     * <br>
+     * This is mostly derived from
+     * <a href="https://github.com/maltaisn/msdf-gdx/blob/v0.2.1/lib/src/main/resources/font.frag">msdf-gdx</a>, which
+     * is Apache 2.0-licensed.
      */
-    public static final String msdfFragmentShader = "#ifdef GL_ES\n"
-            + "	precision mediump float;\n"
-            + "	precision mediump int;\n"
-            + "#endif\n"
-            + "\n"
-            + "uniform sampler2D u_texture;\n"
-            + "uniform float u_smoothing;\n"
-            + "varying vec4 v_color;\n"
-            + "varying vec2 v_texCoords;\n"
-            + "\n"
-            + "void main() {\n"
-            + "  vec3 sdf = texture2D(u_texture, v_texCoords).rgb;\n"
-            + "  gl_FragColor = vec4(v_color.rgb, clamp((max(min(sdf.r, sdf.g), min(max(sdf.r, sdf.g), sdf.b)) - 0.5) * u_smoothing + 0.5, 0.0, 1.0) * v_color.a);\n"
-            + "}\n";
+    public static final String msdfFragmentShader =
+            "#ifdef GL_ES\n" +
+                    "precision mediump float;\n" +
+                    "#endif\n" +
+                    "#if __VERSION__ >= 130\n" +
+                    "#define TEXTURE texture\n" +
+                    "#else\n" +
+                    "#define TEXTURE texture2D\n" +
+                    "#endif\n" +
+                    "uniform sampler2D u_texture;\n" +
+                    "varying vec4 v_color;\n" +
+                    "varying vec2 v_texCoords;\n" +
+                    "uniform float u_smoothing;\n" +
+                    "uniform float u_weight;\n" +
+                    "float median(float r, float g, float b) {\n" +
+                    "    return max(min(r, g), min(max(r, g), b));\n" +
+                    "}\n" +
+                    "float linearstep(float a, float b, float x) {\n" +
+                    "    return clamp((x - a) / (b - a), 0.0, 1.0);\n" +
+                    "}\n" +
+                    "void main() {\n" +
+                    "    vec4 msdf = TEXTURE(u_texture, v_texCoords);\n" +
+                    "    float distance = u_smoothing * (median(msdf.r, msdf.g, msdf.b) + u_weight - 0.5);\n" +
+                    "    float glyphAlpha = clamp(distance + 0.5, 0.0, 1.0);\n" +
+                    "    gl_FragColor = vec4(v_color.rgb, glyphAlpha * v_color.a);\n" +
+                    "}";
+//            "#ifdef GL_ES\n"
+//            + "	precision mediump float;\n"
+//            + "#endif\n"
+//            + "\n"
+//            + "uniform sampler2D u_texture;\n"
+//            + "uniform float u_smoothing;\n"
+//            + "varying vec4 v_color;\n"
+//            + "varying vec2 v_texCoords;\n"
+//            + "\n"
+//            + "void main() {\n"
+//            + "  vec3 sdf = texture2D(u_texture, v_texCoords).rgb;\n"
+//            + "  gl_FragColor = vec4(v_color.rgb, clamp((max(min(sdf.r, sdf.g), min(max(sdf.r, sdf.g), sdf.b)) - 0.5) * u_smoothing + 0.5, 0.0, 1.0) * v_color.a);\n"
+//            + "}\n";
 
     /**
      * The ShaderProgram used to render this font, as used by {@link #enableShader(Batch)}.
      * If this is null, the font will be rendered with the Batch's default shader.
-     * It may be set to a custom ShaderProgram if {@link #distanceField} is set to {@link DistanceFieldType#MSDF},
-     * or to one created by {@link DistanceFieldFont#createDistanceFieldShader()} if distanceField is set to
-     * {@link DistanceFieldType#SDF}. It can be set to a user-defined ShaderProgram; if it is meant to render
+     * It may be set to a custom ShaderProgram if {@link #distanceField} is set to {@link DistanceFieldType#MSDF}
+     * or {@link DistanceFieldType#SDF}. It can be set to a user-defined ShaderProgram; if it is meant to render
      * MSDF or SDF fonts, then the ShaderProgram should have a {@code uniform float u_smoothing;} that will be
      * set by {@link #enableShader(Batch)}. Values passed to u_smoothing can vary a lot, depending on how the
      * font was initially created, its current scale, and its {@link #actualCrispness} field. You can
@@ -857,7 +1144,7 @@ public class Font implements Disposable {
      *
      * @param cs    a CharSequence, such as a String, containing only digits 0-9 with an optional sign
      * @param start the (inclusive) first character position in cs to read
-     * @param end   the (exclusive) last character position in cs to read (this stops after 10 or 11 characters if end is too large, depending on sign)
+     * @param end   the (exclusive) last character position in cs to read (this will stop early if it encounters any invalid char, or 10 digits have been read, not including sign)
      * @return the int that cs represents
      */
     public static int intFromDec(final CharSequence cs, final int start, int end) {
@@ -886,6 +1173,60 @@ public class Font implements Disposable {
             data = data * 10 + h;
         }
         return data * len;
+    }
+
+    /**
+     * Reads in a CharSequence containing only decimal digits (0-9) with an optional sign at the start and an optional
+     * decimal point anywhere in the CharSequence, and returns the float they represent, reading until it encounters the
+     * end of the sequence or any invalid char, then returning the result if valid, or 0 if nothing could be read.
+     * The leading sign can be '+' or '-' if present.
+     * <br>
+     * This is somewhat similar to the JDK's {@link Float#parseFloat(String)} method, but this also supports
+     * CharSequence data instead of just String data, and allows specifying a start and end, but doesn't support
+     * scientific notation or hexadecimal float notation. This doesn't throw on invalid input, either, instead returning
+     * 0 if the first char is not a decimal digit, or stopping the parse process early if a non-decimal-digit char is
+     * read before end is reached. If the parse is stopped early, this behaves as you would expect for a number with
+     * fewer digits, and simply doesn't fill the larger places.
+     *
+     * @param cs    a CharSequence, such as a String, containing digits 0-9 with an optional sign and decimal point
+     * @param start the (inclusive) first character position in cs to read
+     * @param end   the (exclusive) last character position in cs to read (this will stop early if it encounters any invalid char)
+     * @return the float that cs represents
+     */
+    public static float floatFromDec(final CharSequence cs, final int start, int end) {
+        int len, h;
+        float decimal = 1f;
+        boolean foundPoint = false;
+        if (cs == null || start < 0 || end <= 0 || end - start <= 0
+                || (len = cs.length()) - start <= 0 || end > len)
+            return 0;
+        char c = cs.charAt(start);
+        if (c == '-') {
+            len = -1;
+            h = 0;
+        } else if (c == '+') {
+            len = 1;
+            h = 0;
+        } else if (c > 102 || (h = hexCodes[c]) < 0 || h > 9)
+            return 0;
+        else {
+            len = 1;
+        }
+        int data = h;
+        for (int i = start + 1; i < end; i++) {
+            c = cs.charAt(i);
+            if(c == '.') {
+                foundPoint = true;
+                continue;
+            }
+            if (c > 102 || (h = hexCodes[c]) < 0 || h > 9)
+                return data * len / decimal;
+            if(foundPoint){
+                decimal *= 10f;
+            }
+            data = data * 10 + h;
+        }
+        return data * len / decimal;
     }
 
     private static int indexAfter(String text, String search, int from) {
@@ -955,6 +1296,18 @@ public class Font implements Disposable {
     //// constructor section
 
     /**
+     * Constructs a Font from a newly-created default BitmapFont, as by {@link BitmapFont#BitmapFont()}, passing it to
+     * {@link #Font(BitmapFont, float, float, float, float)}. This means this constructor will always produce a Font
+     * based on 15-point Liberation Sans, with a shadow effect applied to all chars. The shadow may cause some effects,
+     * such as bold and strikethrough, to look incorrect, so this is mostly useful for testing. Note, you can add a
+     * shadow effect to any of the fonts in {@link KnownFonts} by using the {@code [%?shadow]} mode, so you don't
+     * typically need or want the shadow to be applied to the font beforehand.
+     */
+    public Font() {
+        this(new BitmapFont(), 0f, 0f, 0f, 0f);
+    }
+
+    /**
      * Constructs a Font by reading in the given .fnt file and loading any images it specifies. Tries an internal handle
      * first, then a local handle. Does not use a distance field effect.
      *
@@ -1015,6 +1368,28 @@ public class Font implements Disposable {
         originalCellWidth = toCopy.originalCellWidth;
         originalCellHeight = toCopy.originalCellHeight;
         descent = toCopy.descent;
+
+        boldStrength = toCopy.boldStrength;
+        obliqueStrength = toCopy.obliqueStrength;
+        underX = toCopy.underX;
+        underY = toCopy.underY;
+        underLength = toCopy.underLength;
+        underBreadth = toCopy.underBreadth;
+        strikeX = toCopy.strikeX;
+        strikeY = toCopy.strikeY;
+        strikeLength = toCopy.strikeLength;
+        strikeBreadth = toCopy.strikeBreadth;
+        fancyX = toCopy.fancyX;
+        fancyY = toCopy.fancyY;
+
+        xAdjust =      toCopy.xAdjust;
+        yAdjust =      toCopy.yAdjust;
+        widthAdjust =  toCopy.widthAdjust;
+        heightAdjust = toCopy.heightAdjust;
+        inlineImageOffsetX = toCopy.inlineImageOffsetX;
+        inlineImageOffsetY = toCopy.inlineImageOffsetY;
+        inlineImageXAdvance = toCopy.inlineImageXAdvance;
+
         mapping = new IntMap<>(toCopy.mapping.size);
         for (IntMap.Entry<GlyphRegion> e : toCopy.mapping) {
             if (e.value == null) continue;
@@ -1025,20 +1400,40 @@ public class Font implements Disposable {
         if(toCopy.namesByCharCode != null)
             namesByCharCode = new IntMap<>(toCopy.namesByCharCode);
         defaultValue = toCopy.defaultValue;
-        kerning = toCopy.kerning == null ? null : new IntIntMap(toCopy.kerning);
+        kerning = toCopy.kerning == null ? null : new IntFloatMap(toCopy.kerning);
         solidBlock = toCopy.solidBlock;
         name = toCopy.name;
         integerPosition = toCopy.integerPosition;
 
-        if (toCopy.family != null)
+        if (toCopy.family != null) {
             family = new FontFamily(toCopy.family);
+            Font[] connected = family.connected;
+            for (int i = 0; i < connected.length; i++) {
+                Font f = connected[i];
+                if (f == toCopy) {
+                    connected[i] = this;
+                    break;
+                }
+            }
+            if (toCopy.name != null) {
+                int connect = family.fontAliases.remove(toCopy.name, -1);
+                if(connect != -1 && name != null) family.fontAliases.put(name, connect);
+            }
+        }
 
-        // shader and colorLookup are not copied, because there isn't much point in having different copies of
-        // a ShaderProgram or stateless ColorLookup. They are referenced directly.
+        PACKED_BLACK = toCopy.PACKED_BLACK;
+        PACKED_WHITE = toCopy.PACKED_WHITE;
+        PACKED_ERROR_COLOR = toCopy.PACKED_ERROR_COLOR;
+        PACKED_WARN_COLOR = toCopy.PACKED_WARN_COLOR;
+        PACKED_NOTE_COLOR = toCopy.PACKED_NOTE_COLOR;
+
+        // shader, colorLookup, and whiteBlock are not copied, because there isn't much point in having different copies
+        // of a ShaderProgram, stateless ColorLookup, or always-identical Texture. They are referenced directly.
         if (toCopy.shader != null)
             shader = toCopy.shader;
         if (toCopy.colorLookup != null)
             colorLookup = toCopy.colorLookup;
+        whiteBlock = toCopy.whiteBlock;
     }
 
     /**
@@ -1110,7 +1505,7 @@ public class Font implements Disposable {
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "MSDF shader failed to compile: " + shader.getLog());
         } else if (distanceField == DistanceFieldType.SDF) {
-            shader = DistanceFieldFont.createDistanceFieldShader();
+            shader = new ShaderProgram(vertexShader, sdfFragmentShader);
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "SDF shader failed to compile: " + shader.getLog());
         }
@@ -1189,7 +1584,7 @@ public class Font implements Disposable {
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "MSDF shader failed to compile: " + shader.getLog());
         } else if (distanceField == DistanceFieldType.SDF) {
-            shader = DistanceFieldFont.createDistanceFieldShader();
+            shader = new ShaderProgram(vertexShader, sdfFragmentShader);
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "SDF shader failed to compile: " + shader.getLog());
         }
@@ -1277,7 +1672,7 @@ public class Font implements Disposable {
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "MSDF shader failed to compile: " + shader.getLog());
         } else if (distanceField == DistanceFieldType.SDF) {
-            shader = DistanceFieldFont.createDistanceFieldShader();
+            shader = new ShaderProgram(vertexShader, sdfFragmentShader);
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "SDF shader failed to compile: " + shader.getLog());
         }
@@ -1357,7 +1752,7 @@ public class Font implements Disposable {
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "MSDF shader failed to compile: " + shader.getLog());
         } else if (distanceField == DistanceFieldType.SDF) {
-            shader = DistanceFieldFont.createDistanceFieldShader();
+            shader = new ShaderProgram(vertexShader, sdfFragmentShader);
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "SDF shader failed to compile: " + shader.getLog());
         }
@@ -1434,7 +1829,7 @@ public class Font implements Disposable {
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "MSDF shader failed to compile: " + shader.getLog());
         } else if (distanceField == DistanceFieldType.SDF) {
-            shader = DistanceFieldFont.createDistanceFieldShader();
+            shader = new ShaderProgram(vertexShader, sdfFragmentShader);
             if (!shader.isCompiled())
                 Gdx.app.error("textratypist", "SDF shader failed to compile: " + shader.getLog());
         }
@@ -1448,10 +1843,16 @@ public class Font implements Disposable {
         mapping = new IntMap<>(128);
         int minWidth = Integer.MAX_VALUE;
 
+        this.xAdjust = xAdjust;
+        this.yAdjust = yAdjust;
+        this.widthAdjust = widthAdjust;
+        this.heightAdjust = heightAdjust;
+
         descent = bmFont.getDescent();
         // Needed to make emoji and other texture regions appear at a reasonable height on the line.
         // Also moves the descender so that it isn't below the baseline, which causes issues.
-        yAdjust += descent;
+//        yAdjust += descent;
+//        yAdjust += descent + bmFont.getLineHeight() * 0.5f;
         for (BitmapFont.Glyph[] page : data.glyphs) {
             if (page == null) continue;
             for (BitmapFont.Glyph glyph : page) {
@@ -1459,13 +1860,15 @@ public class Font implements Disposable {
                     int x = glyph.srcX, y = glyph.srcY, w = glyph.width, h = glyph.height, a = glyph.xadvance;
 //                    x += xAdjust;
 //                    y += yAdjust;
-                    a += widthAdjust;
-                    h += heightAdjust;
-                    minWidth = Math.min(minWidth, a);
+
+//                    a += widthAdjust;
+//                    h += heightAdjust;
+                    if (glyph.id != 9608) // full block
+                        minWidth = Math.min(minWidth, a);
                     cellWidth = Math.max(a, cellWidth);
-                    cellHeight = Math.max(h, cellHeight);
+                    cellHeight = Math.max(h + heightAdjust, cellHeight);
                     GlyphRegion gr = new GlyphRegion(bmFont.getRegion(glyph.page), x, y, w, h);
-                    if (glyph.id == 10) {
+                    if (glyph.id == 10) { // newline
                         a = 0;
                         gr.offsetX = 0;
                     } else if (makeGridGlyphs && BlockUtils.isBlockGlyph(glyph.id)) {
@@ -1474,10 +1877,10 @@ public class Font implements Disposable {
                         gr.offsetX = glyph.xoffset + xAdjust;
                     }
                     gr.offsetY = (-h - glyph.yoffset) + yAdjust;
-                    gr.xAdvance = a;
+                    gr.xAdvance = a + widthAdjust;
                     mapping.put(glyph.id & 0xFFFF, gr);
                     if (glyph.kerning != null) {
-                        if (kerning == null) kerning = new IntIntMap(128);
+                        if (kerning == null) kerning = new IntFloatMap(128);
                         for (int b = 0; b < glyph.kerning.length; b++) {
                             byte[] kern = glyph.kerning[b];
                             if (kern != null) {
@@ -1555,7 +1958,7 @@ public class Font implements Disposable {
         }
         defaultValue = mapping.get(data.missingGlyph == null ? ' ' : data.missingGlyph.id, mapping.get(' ', mapping.values().next()));
         originalCellWidth = cellWidth;
-        originalCellHeight = cellHeight;
+        originalCellHeight = cellHeight;// += descent;
         isMono = minWidth == cellWidth && kerning == null;
         integerPosition = bmFont.usesIntegerPositions();
         scale(bmFont.getScaleX(), bmFont.getScaleY());
@@ -1595,15 +1998,28 @@ public class Font implements Disposable {
         } else {
             throw new RuntimeException("Missing font file: " + fntName);
         }
-        int idx = indexAfter(fnt, "lineHeight=", 0);
-        int rawLineHeight = intFromDec(fnt, idx, idx = indexAfter(fnt, "base=", idx));
-        int baseline = intFromDec(fnt, idx, idx = indexAfter(fnt, "pages=", idx));
-        descent = baseline - rawLineHeight;
+        this.xAdjust = xAdjust;
+        this.yAdjust = yAdjust;
+        this.widthAdjust = widthAdjust;
+        this.heightAdjust = heightAdjust;
+        int idx;
+        idx = indexAfter(fnt, "padding=", 0);
+        int padTop = intFromDec(fnt, idx, idx = indexAfter(fnt, ",", idx+1));
+        int padRight = intFromDec(fnt, idx, idx = indexAfter(fnt, ",", idx+1));
+        int padBottom = intFromDec(fnt, idx, idx = indexAfter(fnt, ",", idx+1));
+        int padLeft = intFromDec(fnt, idx, idx = indexAfter(fnt, "lineHeight=", idx+1));
+
+        float rawLineHeight = floatFromDec(fnt, idx, idx = indexAfter(fnt, "base=", idx));
+        float baseline = floatFromDec(fnt, idx, idx = indexAfter(fnt, "pages=", idx));
+//        descent = baseline - rawLineHeight;
+        descent = 0;
+
+//        int chosenDescender = -1;
 
         // The SDF and MSDF fonts have essentially garbage for baseline, since Glamer can't accurately guess it.
         // For standard fonts, we incorporate the descender into yAdjust, which seems to be reliable.
-        if(distanceField == DistanceFieldType.STANDARD)
-            yAdjust += descent;
+//        if(distanceField == DistanceFieldType.STANDARD)
+//            yAdjust += descent;
         int pages = intFromDec(fnt, idx, idx = indexAfter(fnt, "\npage id=", idx));
         if (parents == null || parents.size < pages) {
             if (parents == null) parents = new Array<>(true, pages, TextureRegion.class);
@@ -1624,26 +2040,27 @@ public class Font implements Disposable {
         }
         int size = intFromDec(fnt, idx = indexAfter(fnt, "\nchars count=", idx), idx = indexAfter(fnt, "\nchar id=", idx));
         mapping = new IntMap<>(size);
-        int minWidth = Integer.MAX_VALUE;
+        float minWidth = Integer.MAX_VALUE;
         for (int i = 0; i < size; i++) {
             if (idx == fnt.length())
                 break;
-            int c = intFromDec(fnt, idx, idx = indexAfter(fnt, " x=", idx));
-            int x = intFromDec(fnt, idx, idx = indexAfter(fnt, " y=", idx));
-            int y = intFromDec(fnt, idx, idx = indexAfter(fnt, " width=", idx));
-            int w = intFromDec(fnt, idx, idx = indexAfter(fnt, " height=", idx));
-            int h = intFromDec(fnt, idx, idx = indexAfter(fnt, " xoffset=", idx));
-            int xo = intFromDec(fnt, idx, idx = indexAfter(fnt, " yoffset=", idx));
-            int yo = intFromDec(fnt, idx, idx = indexAfter(fnt, " xadvance=", idx));
-            int a = intFromDec(fnt, idx, idx = indexAfter(fnt, " page=", idx));
-            int p = intFromDec(fnt, idx, idx = indexAfter(fnt, "\nchar id=", idx));
+            int c =    intFromDec(fnt, idx, idx = indexAfter(fnt, " x=", idx));
+            float x =  floatFromDec(fnt, idx, idx = indexAfter(fnt, " y=", idx));
+            float y =  floatFromDec(fnt, idx, idx = indexAfter(fnt, " width=", idx));
+            float w =  floatFromDec(fnt, idx, idx = indexAfter(fnt, " height=", idx));
+            float h =  floatFromDec(fnt, idx, idx = indexAfter(fnt, " xoffset=", idx));
+            float xo = floatFromDec(fnt, idx, idx = indexAfter(fnt, " yoffset=", idx));
+            float yo = floatFromDec(fnt, idx, idx = indexAfter(fnt, " xadvance=", idx));
+            float a =  floatFromDec(fnt, idx, idx = indexAfter(fnt, " page=", idx));
+            int p =    intFromDec(fnt, idx, idx = indexAfter(fnt, "\nchar id=", idx));
 
 //            x += xAdjust;
 //            y += yAdjust;
-            a += widthAdjust;
-            h += heightAdjust;
+
+//            a += widthAdjust;
+//            h += heightAdjust;
             if (c != 9608) // full block
-                minWidth = Math.min(minWidth, a);
+                minWidth = Math.min(minWidth, a + widthAdjust);
             GlyphRegion gr = new GlyphRegion(parents.get(p), x, y, w, h);
             if (c == 10) {
                 a = 0;
@@ -1653,28 +2070,38 @@ public class Font implements Disposable {
             } else
                 gr.offsetX = xo + xAdjust;
             gr.offsetY = yo + yAdjust;
-            gr.xAdvance = a;
-            cellWidth = Math.max(a, cellWidth);
-            cellHeight = Math.max(h, cellHeight);
+            gr.xAdvance = a + widthAdjust;
+
+            cellWidth = Math.max(a + widthAdjust, cellWidth);
+            cellHeight = Math.max(h + heightAdjust, cellHeight);
+            if (w * h > 1) {
+                descent = Math.min(baseline - h - yo, descent);
+//                if(descent != (descent = Math.min(baseline - h - yo, descent)))
+//                    chosenDescender = c;
+            }
             mapping.put(c, gr);
             if (c == '[') {
                 mapping.put(2, gr);
             }
         }
+        descent += padBottom;
+//        System.out.println("Using descender from " + chosenDescender);
         idx = indexAfter(fnt, "\nkernings count=", 0);
         if (idx < fnt.length()) {
             int kernings = intFromDec(fnt, idx, idx = indexAfter(fnt, "\nkerning first=", idx));
-            kerning = new IntIntMap(kernings);
-            for (int i = 0; i < kernings; i++) {
-                int first = intFromDec(fnt, idx, idx = indexAfter(fnt, " second=", idx));
-                int second = intFromDec(fnt, idx, idx = indexAfter(fnt, " amount=", idx));
-                int amount = intFromDec(fnt, idx, idx = indexAfter(fnt, "\nkerning first=", idx));
-                kerning.put(first << 16 | second, amount);
-                if (first == '[') {
-                    kerning.put(2 << 16 | second, amount);
-                }
-                if (second == '[') {
-                    kerning.put(first << 16 | 2, amount);
+            if(kernings >= 1) {
+                kerning = new IntFloatMap(kernings);
+                for (int i = 0; i < kernings; i++) {
+                    int first = intFromDec(fnt, idx, idx = indexAfter(fnt, " second=", idx));
+                    int second = intFromDec(fnt, idx, idx = indexAfter(fnt, " amount=", idx));
+                    float amount = floatFromDec(fnt, idx, idx = indexAfter(fnt, "\nkerning first=", idx));
+                    kerning.put(first << 16 | second, amount);
+                    if (first == '[') {
+                        kerning.put(2 << 16 | second, amount);
+                    }
+                    if (second == '[') {
+                        kerning.put(first << 16 | 2, amount);
+                    }
                 }
             }
         }
@@ -1759,7 +2186,7 @@ public class Font implements Disposable {
         int padding = fnt.getInt("GlyphPadding");
         cellHeight = fnt.getInt("GlyphHeight");
         cellWidth = fnt.getInt("GlyphWidth");
-        descent = Math.round(cellHeight * -0.25f);
+        descent = Math.round(cellHeight * -0.375f);
         int rows = (parent.getRegionHeight() - padding) / ((int) cellHeight + padding);
         int size = rows * columns;
         mapping = new IntMap<>(size + 1);
@@ -1767,7 +2194,7 @@ public class Font implements Disposable {
             for (int x = 0; x < columns; x++, c++) {
                 GlyphRegion gr = new GlyphRegion(parent, x * ((int) cellWidth + padding) + padding, y * ((int) cellHeight + padding) + padding, (int) cellWidth, (int) cellHeight);
                 gr.offsetX = 0;
-                gr.offsetY = -descent;
+                gr.offsetY = cellHeight * 0.5f + descent;
                 if (c == 10) {
                     gr.xAdvance = 0;
                 } else {
@@ -1805,6 +2232,7 @@ public class Font implements Disposable {
         defaultValue = mapping.get(' ', mapping.get(0));
         originalCellWidth = this.cellWidth;
         originalCellHeight = this.cellHeight;
+        integerPosition = true;
         isMono = true;
     }
 
@@ -1813,7 +2241,7 @@ public class Font implements Disposable {
     /**
      * Assembles two chars into a kerning pair that can be looked up as a key in {@link #kerning}. This is unlikely to
      * be used by most user code, but can be useful for anything that's digging deeply into the internals here.
-     * If you give such a pair to {@code kerning}'s {@link IntIntMap#get(int, int)} method, you'll get the amount of
+     * If you give such a pair to {@code kerning}'s {@link IntFloatMap#get(int, float)} method, you'll get the amount of
      * extra space (in the same unit the font uses) this will insert between {@code first} and {@code second}.
      *
      * @param first  the first char
@@ -1864,6 +2292,8 @@ public class Font implements Disposable {
     public Font adjustLineHeight(float multiplier) {
         cellHeight *= multiplier;
         originalCellHeight *= multiplier;
+        descent *= multiplier; // I'm not sure if this would help or not.
+//        underY *= multiplier; strikeY *= multiplier; // Very unsure about this.
         return this;
     }
 
@@ -1877,6 +2307,7 @@ public class Font implements Disposable {
     public Font adjustCellWidth(float multiplier) {
         cellWidth *= multiplier;
         originalCellWidth *= multiplier;
+//        underX *= multiplier; strikeX *= multiplier; // Unsure about this.
         return this;
     }
 
@@ -1891,23 +2322,166 @@ public class Font implements Disposable {
      * @return this Font, for chaining
      */
     public Font fitCell(float width, float height, boolean center) {
+//        float hRatio = width / cellWidth;
+//        float vRatio = height / cellHeight;
+//        underX *= hRatio; strikeX *= hRatio;
+//        underY *= vRatio; strikeY *= vRatio;
         cellWidth = width;
         cellHeight = height;
         float wsx = width / scaleX;
-        IntMap.Values<GlyphRegion> vs = mapping.values();
+        IntMap.Entries<GlyphRegion> vs = mapping.entries();
         if (center) {
             while (vs.hasNext) {
-                GlyphRegion g = vs.next();
-                g.offsetX += (wsx - g.xAdvance) * 0.5f;
-                g.xAdvance = wsx;
+                IntMap.Entry<GlyphRegion> ent = vs.next();
+                GlyphRegion g = ent.value;
+                if(ent.key >= 0xE000 && ent.key < 0xF800) {
+//                    g.offsetY -= descent;
+                } else{
+                    g.offsetX += (wsx - g.xAdvance) * 0.5f;
+                    g.xAdvance = wsx;
+                }
             }
         } else {
             while (vs.hasNext) {
-                vs.next().xAdvance = wsx;
+                IntMap.Entry<GlyphRegion> ent = vs.next();
+                if(ent.key >= 0xE000 && ent.key < 0xF800) {
+//                    ent.value.offsetY -= descent;
+                } else{
+                    ent.value.xAdvance = wsx;
+                }
             }
         }
         isMono = true;
         kerning = null;
+        return this;
+    }
+
+    public float getUnderlineX() {
+        return underX;
+    }
+
+    public float getUnderlineY() {
+        return underY;
+    }
+
+    public Font setUnderlinePosition(float underX, float underY) {
+        this.underX = underX;
+        this.underY = underY;
+        return this;
+    }
+    
+    public Font setUnderlineMetrics(float underX, float underY, float underLength, float underBreadth) {
+        this.underX = underX;
+        this.underY = underY;
+        this.underLength = underLength;
+        this.underBreadth = underBreadth;
+        return this;
+    }
+
+    public float getStrikethroughX() {
+        return strikeX;
+    }
+
+    public float getStrikethroughY() {
+        return strikeY;
+    }
+
+    public Font setStrikethroughPosition(float strikeX, float strikeY) {
+        this.strikeX = strikeX;
+        this.strikeY = strikeY;
+        return this;
+    }
+    
+    public Font setStrikethroughMetrics(float strikeX, float strikeY, float strikeLength, float strikeBreadth) {
+        this.strikeX = strikeX;
+        this.strikeY = strikeY;
+        this.strikeLength = strikeLength;
+        this.strikeBreadth = strikeBreadth;
+        return this;
+    }
+
+    /**
+     * Sets both the underline and strikethrough metric adjustments with the same values, as if you called both
+     * {@link #setUnderlineMetrics(float, float, float, float)} and
+     * {@link #setStrikethroughMetrics(float, float, float, float)} with identical parameters.
+     * This does not affect "fancy lines" (the zigzag lines produced by error, warning, and note effects).
+     * <br>
+     * This affects "Zen" metrics, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and each metric only affects one value (even though
+     * this sets two metrics for each parameter).
+     * @param x adjustment for the underline and strikethrough x-position, affecting the left side of each line
+     * @param y adjustment for the underline and strikethrough y-position, affecting the bottom side of each line
+     * @param length adjustment for the underline and strikethrough x-size, affecting the extra part drawn to the right of each line
+     * @param breadth adjustment for the underline and strikethrough y-size, affecting how thick each line is from bottom to top
+     * @return this, for chaining
+     */
+    public Font setLineMetrics(float x, float y, float length, float breadth) {
+        this.underX = x;
+        this.underY = y;
+        this.underLength = length;
+        this.underBreadth = breadth;
+        this.strikeX = x;
+        this.strikeY = y;
+        this.strikeLength = length;
+        this.strikeBreadth = breadth;
+        return this;
+    }
+
+    public float getFancyLineX() {
+        return fancyX;
+    }
+
+    public float getFancyLineY() {
+        return fancyY;
+    }
+
+    /**
+     * Sets both the "fancy line" metric adjustments for position, only changing {@link #fancyX} and {@link #fancyY}.
+     * "Fancy lines" are the zigzag lines produced by error, warning, and note effects. This does not change the normal
+     * underline or the strikethrough styles.
+     * <br>
+     * This affects "Zen" metrics, which means it is measured in fractions of
+     * {@link #cellWidth} or {@link #cellHeight} (as appropriate), and each metric only affects one value (even though
+     * this sets two metrics for each parameter).
+     * @param x adjustment for the "fancy line" x-position, affecting the left side of each line
+     * @param y adjustment for the "fancy line" y-position, affecting the bottom side of each line
+     * @return this, for chaining
+     */
+    public Font setFancyLinePosition(float x, float y) {
+        this.fancyX = x;
+        this.fancyY = y;
+        return this;
+    }
+
+    public float getInlineImageOffsetX() {
+        return inlineImageOffsetX;
+    }
+
+    public float getInlineImageOffsetY() {
+        return inlineImageOffsetY;
+    }
+
+    public float getInlineImageXAdvance() {
+        return inlineImageXAdvance;
+    }
+
+    /**
+     * Sets the adjustments added to the metric for inline images added with {@link #addAtlas(TextureAtlas)} (or its
+     * overloads).
+     * <br>
+     * Changing offsetX with a positive value moves all GlyphRegions to the right.
+     * Changing offsetY with a positive value moves all GlyphRegions down (this is possibly unexpected).
+     * Changing xAdvance with a positive value will shrink all GlyphRegions (this is probably unexpected).
+     *
+     * @param offsetX will be added to the {@link GlyphRegion#offsetX} of each added glyph; positive change moves a GlyphRegion to the right
+     * @param offsetY will be added to the {@link GlyphRegion#offsetY} of each added glyph; positive change moves a GlyphRegion down
+     * @param xAdvance will be added to the {@link GlyphRegion#xAdvance} of each added glyph; positive change shrinks a GlyphRegion due to how size is calculated
+     * @return this Font, for chaining
+     */
+    public Font setInlineImageMetrics(float offsetX, float offsetY, float xAdvance) {
+        inlineImageOffsetX = offsetX;
+        inlineImageOffsetY = offsetY;
+        inlineImageXAdvance = xAdvance;
         return this;
     }
 
@@ -1946,9 +2520,22 @@ public class Font implements Disposable {
         }
         return this;
     }
-
+    /**
+     * A no-op unless this is a subclass that overrides {@link Font#handleIntegerPosition(float)}.
+     * @param integer usually ignored
+     * @return this for chaining
+     */
     public Font useIntegerPositions(boolean integer) {
         integerPosition = integer;
+        return this;
+    }
+
+    public float getDescent() {
+        return descent;
+    }
+
+    public Font setDescent(float descent) {
+        this.descent = descent;
         return this;
     }
 
@@ -1958,6 +2545,24 @@ public class Font implements Disposable {
 
     public Font setName(String name) {
         this.name = name;
+        return this;
+    }
+
+    public float getObliqueStrength() {
+        return obliqueStrength;
+    }
+
+    public Font setObliqueStrength(float obliqueStrength) {
+        this.obliqueStrength = obliqueStrength;
+        return this;
+    }
+
+    public float getBoldStrength() {
+        return boldStrength;
+    }
+
+    public Font setBoldStrength(float boldStrength) {
+        this.boldStrength = boldStrength;
         return this;
     }
 
@@ -2060,6 +2665,60 @@ public class Font implements Disposable {
      * @return this Font, for chaining
      */
     public Font addAtlas(TextureAtlas atlas) {
+        return addAtlas(atlas, "", "", 0, 0, 0);
+    }
+    /**
+     * Adds all items in {@code atlas} to the private use area of {@link #mapping}, and stores their names, so they can
+     * be looked up with {@code [+saxophone]} syntax (which is often the same as the {@code [+🎷]} syntax). The names
+     * of TextureRegions in the atlas are treated as case-insensitive, like some file systems.
+     * <a href="https://github.com/tommyettinger/twemoji-atlas/">There are possible emoji atlases here.</a>
+     * This may be useful if you have your own atlas, but for Twemoji in particular, you can use
+     * {@link KnownFonts#addEmoji(Font)} and the Twemoji files in the knownFonts folder. This overload allows specifying
+     * adjustments to the font-like properties of each GlyphRegion added, which may be useful if images from a
+     * particular atlas show up with an incorrect position or have the wrong spacing.
+     * <br>
+     * Changing offsetXChange with a positive value moves all GlyphRegions to the right.
+     * Changing offsetYChange with a positive value moves all GlyphRegions down (this is possibly unexpected).
+     * Changing xAdvanceChange with a positive value will shrink all GlyphRegions (this is probably unexpected).
+     * Each of the metric changes has a variable from this Font added to it; {@link #inlineImageOffsetX},
+     * {@link #inlineImageOffsetY}, and {@link #inlineImageXAdvance} all are added in here.
+     *
+     * @param atlas a TextureAtlas that shouldn't have more than 6144 names; all of it will be used
+     * @param offsetXChange will be added to the {@link GlyphRegion#offsetX} of each added glyph; positive change moves a GlyphRegion to the right
+     * @param offsetYChange will be added to the {@link GlyphRegion#offsetY} of each added glyph; positive change moves a GlyphRegion down
+     * @param xAdvanceChange will be added to the {@link GlyphRegion#xAdvance} of each added glyph; positive change shrinks a GlyphRegion due to how size is calculated
+     * @return this Font, for chaining
+     */
+    public Font addAtlas(TextureAtlas atlas, float offsetXChange, float offsetYChange, float xAdvanceChange) {
+        return addAtlas(atlas, "", "", offsetXChange, offsetYChange, xAdvanceChange);
+    }
+    /**
+     * Adds all items in {@code atlas} to the private use area of {@link #mapping}, and stores their names, so they can
+     * be looked up with {@code [+saxophone]} syntax (which is often the same as the {@code [+🎷]} syntax). The names
+     * of TextureRegions in the atlas are treated as case-insensitive, like some file systems.
+     * <a href="https://github.com/tommyettinger/twemoji-atlas/">There are possible emoji atlases here.</a>
+     * This may be useful if you have your own atlas, but for Twemoji in particular, you can use
+     * {@link KnownFonts#addEmoji(Font)} and the Twemoji files in the knownFonts folder. This overload allows specifying
+     * adjustments to the font-like properties of each GlyphRegion added, which may be useful if images from a
+     * particular atlas show up with an incorrect position or have the wrong spacing. It also allows specifying a String
+     * to prepend and to append that will be prepended and appended to each name, respectively. Either or both of the
+     * Strings to prepend and append may be empty (or equivalently here, null).
+     * <br>
+     * Changing offsetXChange with a positive value moves all GlyphRegions to the right.
+     * Changing offsetYChange with a positive value moves all GlyphRegions down (this is possibly unexpected).
+     * Changing xAdvanceChange with a positive value will shrink all GlyphRegions (this is probably unexpected).
+     * Each of the metric changes has a variable from this Font added to it; {@link #inlineImageOffsetX},
+     * {@link #inlineImageOffsetY}, and {@link #inlineImageXAdvance} all are added in here.
+     *
+     * @param atlas a TextureAtlas that shouldn't have more than 6144 names; all of it will be used
+     * @param prepend will be prepended before each name in the atlas; if null, will be treated as ""
+     * @param append will be appended after each name in the atlas; if null, will be treated as ""
+     * @param offsetXChange will be added to the {@link GlyphRegion#offsetX} of each added glyph; positive change moves a GlyphRegion to the right
+     * @param offsetYChange will be added to the {@link GlyphRegion#offsetY} of each added glyph; positive change moves a GlyphRegion down
+     * @param xAdvanceChange will be added to the {@link GlyphRegion#xAdvance} of each added glyph; positive change shrinks a GlyphRegion due to how size is calculated
+     * @return this Font, for chaining
+     */
+    public Font addAtlas(TextureAtlas atlas, String prepend, String append, float offsetXChange, float offsetYChange, float xAdvanceChange) {
         Array<TextureAtlas.AtlasRegion> regions = atlas.getRegions();
         if(nameLookup == null)
             nameLookup = new CaseInsensitiveIntMap(regions.size, 0.5f);
@@ -2069,27 +2728,48 @@ public class Font implements Disposable {
             namesByCharCode = new IntMap<>(regions.size >> 1, 0.5f);
         else
             namesByCharCode.ensureCapacity(regions.size >> 1);
+        if(prepend == null) prepend = "";
+        if(append == null) append = "";
+
+        offsetXChange += inlineImageOffsetX;
+        offsetYChange += inlineImageOffsetY;
+        xAdvanceChange += inlineImageXAdvance;
+
+        int start = 0xE000 + namesByCharCode.size;
+
         TextureAtlas.AtlasRegion previous = regions.first();
-        GlyphRegion gr = new GlyphRegion(previous);
-//        gr.offsetY -= descent;
-        mapping.put(0xE000, gr);
-        nameLookup.put(previous.name, 0xE000);
-        namesByCharCode.put(0xE000, previous.name);
-        for (int i = 0xE000, a = 1; i < 0xF800 && a < regions.size; a++) {
+        GlyphRegion gr = new GlyphRegion(previous,
+                previous.offsetX + offsetXChange, previous.offsetY + offsetYChange, previous.originalWidth + xAdvanceChange);
+//        gr.offsetY += originalCellHeight * 0.125f;
+        mapping.put(start, gr);
+        String name = prepend + previous.name + append;
+        nameLookup.put(name, start);
+        namesByCharCode.put(start, name);
+        for (int i = start, a = 1; i < 0xF800 && a < regions.size; a++) {
             TextureAtlas.AtlasRegion region = regions.get(a);
             if (previous.getRegionX() == region.getRegionX() && previous.getRegionY() == region.getRegionY()) {
-                nameLookup.put(region.name, i);
+                name = prepend + region.name + append;
+                nameLookup.put(name, i);
                 char f = previous.name.charAt(0);
-                if(f < 0xD800 || f >= 0xE000) // if the previous name didn't start with an emoji char, use this name
-                    namesByCharCode.put(i, region.name);
+                // If the previous name didn't start with an emoji char, use this name. This means if there is only one
+                // name that refers to a region, that name will be used in namesByCharCode, but if there is more than
+                // one sequential name, then names that start with emoji take priority.
+                // This uses a pretty simple check, but it works even for unusual emoji like ‼, which starts with
+                // U+203C, or ✌🏿, which starts with U+270C . It does, however, fail for some natural-language characters
+                // (such as all Chinese characters, which this identifies as emoji). That shouldn't come up often, since
+                // this requires both later-in-Unicode names and earlier-in-Unicode names to refer to the same region.
+                if(f < 0x2000)
+                    namesByCharCode.put(i, name);
             } else {
                 ++i;
                 previous = region;
-                gr = new GlyphRegion(region);
-//                gr.offsetY -= descent;
+                gr = new GlyphRegion(region,
+                        region.offsetX + offsetXChange, region.offsetY + offsetYChange, region.originalWidth + xAdvanceChange);
+//                gr.offsetY += originalCellHeight * 0.125f;
                 mapping.put(i, gr);
-                nameLookup.put(region.name, i);
-                namesByCharCode.put(i, region.name);
+                name = prepend + region.name + append;
+                nameLookup.put(name, i);
+                namesByCharCode.put(i, name);
             }
         }
         return this;
@@ -2126,7 +2806,9 @@ public class Font implements Disposable {
         if (distanceField == DistanceFieldType.MSDF) {
             if (batch.getShader() != shader) {
                 batch.setShader(shader);
-                shader.setUniformf("u_smoothing", 7f * actualCrispness * Math.max(cellHeight / originalCellHeight, cellWidth / originalCellWidth));
+                shader.setUniformf("u_weight", 0f);
+                shader.setUniformf("u_smoothing", 2f * distanceFieldCrispness);
+//                shader.setUniformf("u_smoothing", 7f * actualCrispness * Math.max(cellHeight / originalCellHeight, cellWidth / originalCellWidth));
             }
         } else if (distanceField == DistanceFieldType.SDF) {
             if (batch.getShader() != shader) {
@@ -2135,9 +2817,11 @@ public class Font implements Disposable {
                 shader.setUniformf("u_smoothing", (actualCrispness / (scale)));
             }
         } else {
-            batch.setShader(null);
+            if(batch.getShader() != shader) {
+                batch.setShader(null);
+            }
         }
-        batch.setPackedColor(Color.WHITE_FLOAT_BITS);
+//        batch.setPackedColor(Color.WHITE_FLOAT_BITS); // not sure why this was here, or if it is useful...
     }
 
     /**
@@ -2180,10 +2864,10 @@ public class Font implements Disposable {
      * then nothing will be drawn there. The 2D array is treated as [x][y] indexed here. This is usually called before
      * other methods that draw foreground text.
      * <br>
-     * Internally, this uses {@link Batch#draw(Texture, float[], int, int)} to draw each rectangle with minimal
-     * overhead, and this also means it is unaffected by the batch color. If you want to alter the colors using a
-     * shader, the shader will receive each color in {@code colors} as its {@code a_color} attribute, the same as if it
-     * was passed via the batch color.
+     * Internally, this uses {@link #drawVertices(Batch, Texture, float[])} to draw each rectangle with minimal
+     * overhead, and this also means it is unaffected by the batch color unless drawVertices was overridden. If you want
+     * to alter the colors using a shader, the shader will receive each color in {@code colors} as its {@code a_color}
+     * attribute, the same as if it was passed via the batch color.
      * <br>
      * If you want to change the alpha of the colors array, you can use
      * {@link ColorUtils#multiplyAllAlpha(int[][], float)}.
@@ -2206,10 +2890,10 @@ public class Font implements Disposable {
      * then nothing will be drawn there. The 2D array is treated as [x][y] indexed here. This is usually called before
      * other methods that draw foreground text.
      * <br>
-     * Internally, this uses {@link Batch#draw(Texture, float[], int, int)} to draw each rectangle with minimal
-     * overhead, and this also means it is unaffected by the batch color. If you want to alter the colors using a
-     * shader, the shader will receive each color in {@code colors} as its {@code a_color} attribute, the same as if it
-     * was passed via the batch color.
+     * Internally, this uses {@link #drawVertices(Batch, Texture, float[])} to draw each rectangle with minimal
+     * overhead, and this also means it is unaffected by the batch color unless drawVertices was overridden. If you want
+     * to alter the colors using a shader, the shader will receive each color in {@code colors} as its {@code a_color}
+     * attribute, the same as if it was passed via the batch color.
      * <br>
      * If you want to change the alpha of the colors array, you can use
      * {@link ColorUtils#multiplyAllAlpha(int[][], float)}.
@@ -2265,7 +2949,7 @@ public class Font implements Disposable {
                 if ((colors[xi][yi] & 254) != 0) {
                     vertices[2] = vertices[7] = vertices[12] = vertices[17] =
                             NumberUtils.intBitsToFloat(Integer.reverseBytes(colors[xi][yi] & -2));
-                    batch.draw(parent, vertices, 0, 20);
+                    drawVertices(batch, parent, vertices);
                 }
                 vertices[1] = vertices[16] += cellHeight;
                 vertices[6] = vertices[11] += cellHeight;
@@ -2343,7 +3027,7 @@ public class Font implements Disposable {
             vertices[18] = u2;
             vertices[19] = v;
 
-            batch.draw(parent, vertices, 0, 20);
+            drawVertices(batch, parent, vertices);
         }
     }
     /**
@@ -2374,10 +3058,10 @@ public class Font implements Disposable {
 
         float startX, startY, sizeX, sizeY;
         for (int b = 0; b < sequence.length; b += 4) {
-            startX = (sequence[b] * width);
-            startY = (sequence[b + 1] * height);
-            sizeX = (sequence[b + 2] * width);
-            sizeY = (sequence[b + 3] * height);
+            startX = (sequence[b] * width)      - width  * 0.5f;
+            startY = (sequence[b + 1] * height) - height * 0.5f;
+            sizeX =  (sequence[b + 2] * width);
+            sizeY =  (sequence[b + 3] * height);
 
             float p0x = startX;
             float p0y = startY + sizeY;
@@ -2406,7 +3090,7 @@ public class Font implements Disposable {
             vertices[18] = u2;
             vertices[19] = v;
 
-            batch.draw(parent, vertices, 0, 20);
+            drawVertices(batch, parent, vertices);
         }
     }
 
@@ -2433,16 +3117,17 @@ public class Font implements Disposable {
         final float u = block.getU(),
                 v = block.getV(),
                 u2 = u + ipw,
-                v2 = v - iph;
+                v2 = v + iph;
         final float sn = MathUtils.sinDeg(rotation);
         final float cs = MathUtils.cosDeg(rotation);
         float color;// = -0X1.0P125f; // black
         if(mode == ERROR)
-            color = -0x1.0001fep125F; // red for error
+            color = PACKED_ERROR_COLOR; // red for error, 0xFF0000FF
         else if(mode == WARN)
-            color = -0x1.21abfep125F; // gold/saffron/yellow
+            color = PACKED_WARN_COLOR; // gold/saffron/yellow, 0xFFD510FF
         else// if(mode == NOTE)
-            color = -0x1.71106p126F; // cyan/denim
+            color = PACKED_NOTE_COLOR; // cyan/denim, 0x3088B8FF
+        color = ColorUtils.multiplyAlpha(color, batch.getColor().a);
         int index = 0;
         for (float startX = 0f, shiftY = 0f; startX <= width; startX += xPx, index++) {
             float p0x;
@@ -2511,7 +3196,7 @@ public class Font implements Disposable {
             vertices[18] = u2;
             vertices[19] = v;
 
-            batch.draw(parent, vertices, 0, 20);
+            drawVertices(batch, parent, vertices);
         }
     }
 
@@ -2572,7 +3257,8 @@ public class Font implements Disposable {
             int n = line.glyphs.size;
             drawn += n;
             if (kerning != null) {
-                int kern = -1, amt;
+                int kern = -1;
+                float amt;
                 long glyph;
                 for (int i = 0; i < n; i++) {
                     kern = kern << 16 | (int) ((glyph = line.glyphs.get(i)) & 0xFFFF);
@@ -2739,24 +3425,30 @@ public class Font implements Disposable {
         for (int i = 0, n = glyphs.glyphs.size; i < n; i++) {
             glyph = glyphs.glyphs.get(i);
             char ch = (char) glyph;
-            if (curly) {
-                if (ch == '}') {
-                    curly = false;
+            if(omitCurlyBraces) {
+                if (curly) {
+                    if (ch == '}') {
+                        curly = false;
+                        continue;
+                    } else if (ch == '{')
+                        curly = false;
+                    else continue;
+                } else if (ch == '{') {
+                    curly = true;
                     continue;
-                } else if (ch == '{')
-                    curly = false;
-                else continue;
-            } else if (ch == '{') {
-                curly = true;
-                continue;
+                }
             }
             Font font = null;
             if (family != null) font = family.connected[(int) (glyph >>> 16 & 15)];
             if (font == null) font = this;
+
+            // These affect each glyph by the same amount; unrelated to per-glyph wobble.
 //            float xx = x + 0.25f * (-(sn * font.cellHeight) + (cs * font.cellWidth));
             float yy = y + 0.25f * (+(cs * font.cellHeight) + (sn * font.cellWidth));
 
-
+//            GlyphRegion gr = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue);
+//            float xx = x + 0.5f * ((cs * gr.xAdvance) + (sn * font.cellHeight));
+//            float yy = y + 0.5f * (-(sn * gr.xAdvance)+ (cs * font.cellHeight));
 
             if (font.kerning != null) {
                 kern = kern << 16 | (int) (glyph & 0xFFFF);
@@ -2765,9 +3457,10 @@ public class Font implements Disposable {
                 xChange += cs * amt;
                 yChange += sn * amt;
             }
-            if(initial){
-                float ox = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue).offsetX
-                        * font.scaleX * ((glyph & ALTERNATE) != 0L ? 4f : (glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
+            if(initial && !isMono){
+                float ox = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue).offsetX;
+                if(ox != ox) ox = 0f;
+                else ox *= font.scaleX * ((glyph & ALTERNATE) != 0L ? 4f : (glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
                 if(ox < 0) {
                     xChange -= cs * ox;
                     yChange -= sn * ox;
@@ -2828,7 +3521,8 @@ public class Font implements Disposable {
         if (tr == null) return 0f;
         float scale;
         if(ch >= 0xE000 && ch < 0xF800)
-            scale = ((glyph & ALTERNATE) != 0L ? 4f : (glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f * cellHeight / (tr.xAdvance*1.25f);
+            scale = ((glyph & ALTERNATE) != 0L ? 4f : (glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f * cellHeight / (tr.xAdvance);
+//            scale = ((glyph & ALTERNATE) != 0L ? 4f : (glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f * cellHeight / (tr.xAdvance*1.25f);
         else
             scale = scaleX * ((glyph & ALTERNATE) != 0L ? 4f : (glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
         float changedW = tr.xAdvance * scale;
@@ -2859,16 +3553,18 @@ public class Font implements Disposable {
             long glyph = glyphs.get(i);
             char ch = (char) glyph;
             if((glyph & SMALL_CAPS) == SMALL_CAPS) ch = Category.caseUp(ch);
-            if (curly) {
-                if (ch == '}') {
-                    curly = false;
+            if(omitCurlyBraces) {
+                if (curly) {
+                    if (ch == '}') {
+                        curly = false;
+                        continue;
+                    } else if (ch == '{')
+                        curly = false;
+                    else continue;
+                } else if (ch == '{') {
+                    curly = true;
                     continue;
-                } else if (ch == '{')
-                    curly = false;
-                else continue;
-            } else if (ch == '{') {
-                curly = true;
-                continue;
+                }
             }
             Font font = null;
             if (family != null) font = family.connected[(int) (glyph >>> 16 & 15)];
@@ -2878,36 +3574,35 @@ public class Font implements Disposable {
             if (font.kerning != null) {
                 kern = kern << 16 | ch;
                 scale = (glyph & ALTERNATE) != 0L ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
-                if((char)glyph >= 0xE000 && (char)glyph < 0xF800){
-                    scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
-                }
+                if((char)glyph >= 0xE000 && (char)glyph < 0xF800)
+                    scaleX = scale * font.cellHeight / (tr.xAdvance);
                 else
                     scaleX = font.scaleX * scale * (1f + 0.5f * (-(glyph & SUPERSCRIPT) >> 63));
                 amt = font.kerning.get(kern, 0) * scaleX;
                 float changedW = tr.xAdvance * scaleX;
-                if(initial){
-                    float ox = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue).offsetX
-                            * scaleX;
+                if(tr.offsetX != tr.offsetX)
+                    changedW = font.cellWidth * scale;
+                else if(initial && !isMono){
+                    float ox = tr.offsetX * scaleX;
                     if(ox < 0) changedW -= ox;
-                    initial = false;
                 }
+                initial = false;
                 drawn += changedW + amt;
             } else {
                 scale = (glyph & ALTERNATE) != 0L ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
-                if((char)glyph >= 0xE000 && (char)glyph < 0xF800){
-                    scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
-                }
+                if((char)glyph >= 0xE000 && (char)glyph < 0xF800)
+                    scaleX = scale * font.cellHeight / (tr.xAdvance);
                 else
                     scaleX = font.scaleX * scale * ((glyph & SUPERSCRIPT) != 0L && !font.isMono ? 0.5f : 1.0f);
+
                 float changedW = tr.xAdvance * scaleX;
-                if (font.isMono)
-                    changedW += tr.offsetX * scaleX;
-                else if(initial){
-                    float ox = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue).offsetX
-                            * scaleX;
+                if(tr.offsetX != tr.offsetX)
+                    changedW = font.cellWidth * scale;
+                else if(initial && !isMono){
+                    float ox = tr.offsetX * scaleX;
                     if(ox < 0) changedW -= ox;
-                    initial = false;
                 }
+                initial = false;
                 drawn += changedW;
             }
         }
@@ -2934,57 +3629,59 @@ public class Font implements Disposable {
             long glyph = glyphs.get(i);
             char ch = (char) glyph;
             if((glyph & SMALL_CAPS) == SMALL_CAPS) ch = Category.caseUp(ch);
-            if (curly) {
-                if (ch == '}') {
-                    curly = false;
+            if(omitCurlyBraces) {
+                if (curly) {
+                    if (ch == '}') {
+                        curly = false;
+                        continue;
+                    } else if (ch == '{')
+                        curly = false;
+                    else continue;
+                } else if (ch == '{') {
+                    curly = true;
                     continue;
-                } else if (ch == '{')
-                    curly = false;
-                else continue;
-            } else if (ch == '{') {
-                curly = true;
-                continue;
+                }
             }
             Font font = null;
             if (family != null) font = family.connected[(int) (glyph >>> 16 & 15)];
             if (font == null) font = this;
             GlyphRegion tr = font.mapping.get(ch);
             if (tr == null) continue;
+            scale = (glyph & ALTERNATE) != 0L || isMono ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
+
             if (font.kerning != null) {
                 kern = kern << 16 | ch;
-                scale = (glyph & ALTERNATE) != 0L ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
-                if(ch >= 0xE000 && ch < 0xF800){
-                    scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
+                if(ch >= 0xE000 && ch < 0xF800) {
+                    scaleX = scale * font.cellHeight / (tr.xAdvance);
                 }
                 else
                     scaleX = font.scaleX * scale * (1f + 0.5f * (-(glyph & SUPERSCRIPT) >> 63));
-                line.height = Math.max(line.height, (font.cellHeight - font.descent * font.scaleY) * scale);
+                line.height = Math.max(line.height, (font.cellHeight /* - font.descent * font.scaleY */) * scale);
                 amt = font.kerning.get(kern, 0) * scaleX;
-                float changedW = xAdvance(font, scaleX, glyph);
-                if(initial){
-                    float ox = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue).offsetX
-                            * scaleX;
+                float changedW = tr.xAdvance * scaleX;
+                if(tr.offsetX != tr.offsetX)
+                    changedW = font.cellWidth * scale;
+                else if(initial && !isMono){
+                    float ox = tr.offsetX * scaleX;
                     if(ox < 0) changedW -= ox;
-                    initial = false;
                 }
+                initial = false;
                 drawn += changedW + amt;
             } else {
-                scale = (glyph & ALTERNATE) != 0L ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
-                line.height = Math.max(line.height, (font.cellHeight - font.descent * font.scaleY) * scale);
-                if((char)glyph >= 0xE000 && (char)glyph < 0xF800){
-                    scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
+                line.height = Math.max(line.height, (font.cellHeight /* - font.descent * font.scaleY */) * scale);
+                if((char)glyph >= 0xE000 && (char)glyph < 0xF800) {
+                    scaleX = scale * font.cellHeight / (tr.xAdvance);
                 }
                 else
                     scaleX = font.scaleX * scale * ((glyph & SUPERSCRIPT) != 0L && !font.isMono ? 0.5f : 1.0f);
-                float changedW = xAdvance(font, scaleX, glyph);
-                if (font.isMono)
-                    changedW += tr.offsetX * scaleX;
-                else if(initial){
-                    float ox = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue).offsetX
-                            * scaleX;
+                float changedW = tr.xAdvance * scaleX;
+                if(tr.offsetX != tr.offsetX)
+                    changedW = font.cellWidth * scale;
+                else if(initial && !isMono){
+                    float ox = tr.offsetX * scaleX;
                     if(ox < 0) changedW -= ox;
-                    initial = false;
                 }
+                initial = false;
                 drawn += changedW;
             }
         }
@@ -2992,6 +3689,14 @@ public class Font implements Disposable {
         return drawn;
     }
 
+    /**
+     * Given a Layout that uses this Font, this will recalculate the width and height of each Line in layout, changing
+     * the values in layout if they are incorrect. This returns the total width of the measured Layout. Most usage will
+     * not necessarily need the return value; either this is called to fix incorrect size information on a Layout, or
+     * the Layout this modifies will be queried for its {@link Layout#getWidth()} and/or {@link Layout#getHeight()}.
+     * @param layout a Layout object that may have the width and height of its lines modified (its content won't change)
+     * @return the total width of the measured Layout, as a float
+     */
     public float calculateSize(Layout layout) {
         float w = 0f;
         float currentHeight = 0f;
@@ -3009,56 +3714,60 @@ public class Font implements Disposable {
                 long glyph = glyphs.get(i);
                 char ch = (char) glyph;
                 if((glyph & SMALL_CAPS) == SMALL_CAPS) ch = Category.caseUp(ch);
-                if (curly) {
-                    if (ch == '}') {
-                        curly = false;
+                if(omitCurlyBraces) {
+                    if (curly) {
+                        if (ch == '}') {
+                            curly = false;
+                            continue;
+                        } else if (ch == '{')
+                            curly = false;
+                        else continue;
+                    } else if (ch == '{') {
+                        curly = true;
                         continue;
-                    } else if (ch == '{')
-                        curly = false;
-                    else continue;
-                } else if (ch == '{') {
-                    curly = true;
-                    continue;
+                    }
                 }
                 Font font = null;
                 if (family != null) font = family.connected[(int) (glyph >>> 16 & 15)];
                 if (font == null) font = this;
                 GlyphRegion tr = font.mapping.get(ch);
                 if (tr == null) continue;
-                scale = (glyph & ALTERNATE) != 0L ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
+                scale = (glyph & ALTERNATE) != 0L || isMono ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
                 if (font.kerning != null) {
                     kern = kern << 16 | ch;
                     if(ch >= 0xE000 && ch < 0xF800){
-                        scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
+                        scaleX = scale * font.cellHeight / (tr.xAdvance);
+//                        scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
                     }
                     else
                         scaleX = font.scaleX * scale * (1f + 0.5f * (-(glyph & SUPERSCRIPT) >> 63));
-                    line.height = Math.max(line.height, currentHeight = (font.cellHeight - font.descent * font.scaleY) * scale);
+                    line.height = Math.max(line.height, currentHeight = (font.cellHeight /* - font.descent * font.scaleY */) * scale);
                     amt = font.kerning.get(kern, 0) * scaleX;
                     float changedW = tr.xAdvance * scaleX;
-                    if(initial){
-                        float ox = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue).offsetX
-                                * scaleX;
+                    if(tr.offsetX != tr.offsetX)
+                        changedW = font.cellWidth * scale;
+                    else if(initial && !isMono){
+                        float ox = tr.offsetX * scaleX;
                         if(ox < 0) changedW -= ox;
-                        initial = false;
                     }
+                    initial = false;
                     drawn += changedW + amt;
                 } else {
-                    line.height = Math.max(line.height, currentHeight = (font.cellHeight - font.descent * font.scaleY) * scale);
+                    line.height = Math.max(line.height, currentHeight = (font.cellHeight /* - font.descent * font.scaleY */) * scale);
                     if(ch >= 0xE000 && ch < 0xF800){
-                        scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
+                        scaleX = scale * font.cellHeight / (tr.xAdvance);
+//                        scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
                     }
                     else
                         scaleX = font.scaleX * scale * ((glyph & SUPERSCRIPT) != 0L && !font.isMono ? 0.5f : 1.0f);
                     float changedW = tr.xAdvance * scaleX;
-                    if (font.isMono)
-                        changedW += tr.offsetX * scaleX;
-                    else if(initial){
-                        float ox = font.mapping.get((int) (glyph & 0xFFFF), font.defaultValue).offsetX
-                                * scaleX;
+                    if(tr.offsetX != tr.offsetX)
+                        changedW = font.cellWidth * scale;
+                    else if(initial && !font.isMono){
+                        float ox = tr.offsetX * scaleX;
                         if(ox < 0) changedW -= ox;
-                        initial = false;
                     }
+                    initial = false;
                     drawn += changedW;
                 }
             }
@@ -3088,21 +3797,23 @@ public class Font implements Disposable {
         for (int i = 0, n = glyphs.size; i < n; i++) {
             long glyph = glyphs.get(i);
             char ch = (char) glyph;
-            if (curly) {
-                if (ch == '}') {
-                    curly = false;
-                    advances.add(0f);
-                    continue;
-                } else if (ch == '{')
-                    curly = false;
-                else {
+            if(omitCurlyBraces) {
+                if (curly) {
+                    if (ch == '}') {
+                        curly = false;
+                        advances.add(0f);
+                        continue;
+                    } else if (ch == '{')
+                        curly = false;
+                    else {
+                        advances.add(0f);
+                        continue;
+                    }
+                } else if (ch == '{') {
+                    curly = true;
                     advances.add(0f);
                     continue;
                 }
-            } else if (ch == '{') {
-                curly = true;
-                advances.add(0f);
-                continue;
             }
             Font font = null;
             if (family != null) font = family.connected[(int) (glyph >>> 16 & 15)];
@@ -3116,11 +3827,12 @@ public class Font implements Disposable {
                 kern = kern << 16 | ch;
                 scale = (glyph & ALTERNATE) != 0L ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
                 if((char)glyph >= 0xE000 && (char)glyph < 0xF800){
-                    scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
+                    scaleX = scale * font.cellHeight / (tr.xAdvance);
+//                    scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
                 }
                 else
                     scaleX = font.scaleX * scale * (1f + 0.5f * (-(glyph & SUPERSCRIPT) >> 63));
-                line.height = Math.max(line.height, (font.cellHeight - font.descent * font.scaleY) * scale);
+                line.height = Math.max(line.height, (font.cellHeight /* - font.descent * font.scaleY */) * scale);
                 amt = font.kerning.get(kern, 0) * scaleX;
                 float changedW = xAdvance(font, scaleX, glyph);
                 if(initial){
@@ -3133,9 +3845,10 @@ public class Font implements Disposable {
                 total += changedW + amt;
             } else {
                 scale = (glyph & ALTERNATE) != 0L ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
-                line.height = Math.max(line.height, (font.cellHeight - font.descent * font.scaleY) * scale);
+                line.height = Math.max(line.height, (font.cellHeight /* - font.descent * font.scaleY */) * scale);
                 if((char)glyph >= 0xE000 && (char)glyph < 0xF800){
-                    scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
+                    scaleX = scale * font.cellHeight / (tr.xAdvance);
+//                    scaleX = scale * font.cellHeight / (tr.xAdvance*1.25f);
                 }
                 else
                     scaleX = font.scaleX * scale * ((glyph & SUPERSCRIPT) != 0L && !font.isMono ? 0.5f : 1.0f);
@@ -3156,8 +3869,21 @@ public class Font implements Disposable {
     }
 
 
+    /*
+     * If {@link #integerPosition} is true, this returns {@code p} rounded to the nearest int; otherwise this just
+     * returns p unchanged.
+     * @param p a float that could be rounded
+     * @return either p rounded to the nearest int or p unchanged, depending on {@link #integerPosition}
+     */
+
+    /**
+     * Currently, this is only an extension point for code that wants to ensure integer positions; it does nothing on
+     * its own other than return its argument unchanged.
+     * @param p a float that could be rounded (it will not be unless this is overridden)
+     * @return unless overridden, p without changes
+     */
     protected float handleIntegerPosition(float p) {
-        return integerPosition ? MathUtils.round(p) : p;
+        return p;//integerPosition ? MathUtils.round(p) : p;
     }
 
     /**
@@ -3242,8 +3968,6 @@ public class Font implements Disposable {
         if (font == null) font = this;
         char c = (char) glyph;
         boolean squashed = false, jostled = false;
-        float cellWidth = font.cellWidth;
-        float cellHeight = font.cellHeight;
         if((glyph & SMALL_CAPS) == SMALL_CAPS) {
             squashed = (c != (c = Category.caseUp(c)));
             glyph = (glyph & 0xFFFFFFFFFFFF0000L) | c;
@@ -3264,37 +3988,43 @@ public class Font implements Disposable {
                 | (int)(batch.getColor().g * (glyph >>> 48 & 0xFF)) << 8
                 | (int)(batch.getColor().b * (glyph >>> 40 & 0xFF)) << 16);
         float scale = ((glyph & ALTERNATE) != 0L) ? 1f : ((glyph + 0x300000L >>> 20 & 15) + 1) * 0.25f;
-        float scaleX, fsx;
-        float scaleY, fsy;
+        float scaleX, fsx, osx;
+        float scaleY, fsy, osy;
         if(c >= 0xE000 && c < 0xF800){
-            fsx = font.cellHeight * 0.8f / tr.xAdvance;
-                    //1.25f * tr.xAdvance / tr.getRegionWidth();
+            fsx = font.cellHeight / tr.xAdvance;
+//            fsx = font.cellHeight * 0.8f / tr.xAdvance;
             fsy = fsx;//0.75f * font.originalCellHeight / tr.getRegionHeight();
-                    //scale * font.cellHeight * 0.8f / tr.xAdvance;//font.cellHeight / (tr.xAdvance * 1.25f);
+            //scale * font.cellHeight * 0.8f / tr.xAdvance;//font.cellHeight / (tr.xAdvance * 1.25f);
             scaleX = scaleY = scale * fsx;
         }
         else
         {
             scaleX = (fsx = font.scaleX) * scale;
             scaleY = (fsy = font.scaleY) * scale;
+//            y -= descent * scaleY;
         }
-        float centerX = cellWidth * scaleX * 0.5f;
-        float centerY = cellHeight * scaleY * 0.5f;
+        osx = font.scaleX * (scale + 1f) * 0.5f;
+        osy = font.scaleY * (scale + 1f) * 0.5f;
+        float centerX = tr.xAdvance * scaleX * 0.5f;
+        float centerY = font.originalCellHeight * scaleY * 0.5f;
 
-        float atlasOffX = 0f, atlasOffY = 0f;
+        float oCenterX = tr.xAdvance * osx * 0.5f;
+        float oCenterY = font.originalCellHeight * osy * 0.5f;
 
-        if(c >= 0xE000 && c < 0xF800){
-            atlasOffX = -cellWidth * 0.25f;
-            atlasOffY = -cellHeight * 0.25f;
-        }
-//        else {
-            y += descent * scale * font.scaleY;
-//        }
-        float ix = font.handleIntegerPosition(x + centerX);
-        float iy = font.handleIntegerPosition(y + centerY);
+        float scaleCorrection = font.descent * fsy * 2f;// - font.descent * osy;
+
+        y += scaleCorrection;
+
+//        y += cos * scaleCorrection;
+//        x += sin * scaleCorrection;
+
+        float ox = x, oy = y;
+
+        float ix = font.handleIntegerPosition(x + oCenterX);
+        float iy = font.handleIntegerPosition(y + oCenterY);
         // The shifts here represent how far the position was moved by handling the integer position, if that was done.
-        float xShift = (x + centerX) - (x = ix);
-        float yShift = (y + centerY) - (y = iy);
+        float xShift = (x + oCenterX) - (ix);
+        float yShift = (y + oCenterY) - (iy);
         // This moves the center to match the movement from integer position.
 //        x += (centerX -= xShift);
 //        y += (centerY -= yShift);
@@ -3302,11 +4032,17 @@ public class Font implements Disposable {
 //        y += centerY - yShift;
 //        x += centerX;
 //        y += centerY;
-        x -= xShift;
-        y -= yShift;
+        x = font.handleIntegerPosition(ix - xShift);
+        y = font.handleIntegerPosition(iy - yShift);
         centerX -= xShift * 0.5f;
         centerY -= yShift * 0.5f;
 
+
+//        x += centerX;
+//        x -= centerX;//
+//        y -= centerY;
+//        x += centerX * cos;
+//        y += centerX * sin;
 //        // when offsetX is NaN, that indicates a box drawing character that we draw ourselves.
 //        if (tr.offsetX != tr.offsetX) {
 //            if(backgroundColor != 0) {
@@ -3321,22 +4057,26 @@ public class Font implements Disposable {
 //                    cellWidth * sizingX, cellHeight * sizingY, rotation);
 //            return cellWidth;
 //        }
+
+
         // when offsetX is NaN, that indicates a box drawing character that we draw ourselves.
         if (tr.offsetX != tr.offsetX) {
             if(backgroundColor != 0) {
                 drawBlockSequence(batch, BlockUtils.BOX_DRAWING[0x88], font.mapping.get(solidBlock, tr),
                         NumberUtils.intToFloatColor(Integer.reverseBytes(backgroundColor)),
                         x,
-                        y,
-                        cellWidth * sizingX, (cellHeight * scale) * sizingY, rotation);
+                        y,// - font.descent * scaleY - font.cellHeight * scale * sizingY * 0.5f,
+                        font.cellWidth * sizingX, font.cellHeight * scale * sizingY, rotation);
             }
             float[] boxes = BlockUtils.BOX_DRAWING[c - 0x2500];
             drawBlockSequence(batch, boxes, font.mapping.get(solidBlock, tr), color,
-                    x,
-                    y,
-                    cellWidth * sizingX, (cellHeight * scale) * sizingY, rotation);
-            return cellWidth;
+//                    x + centerX * cos,
+//                    y + centerX * sin,
+                    x, y,// - font.descent * scaleY - font.cellHeight * scale * sizingY * 0.5f,
+                    font.cellWidth * sizingX, font.cellHeight * scale * sizingY, rotation);
+            return font.cellWidth;
         }
+        x += cellWidth * 0.5f;
 
         Texture tex = tr.getTexture();
         float scaledHeight = font.cellHeight * scale * sizingY;
@@ -3350,10 +4090,25 @@ public class Font implements Disposable {
         float w = tr.getRegionWidth() * scaleX * sizingX;
         float xAdvance = tr.xAdvance;
         float changedW = xAdvance * scaleX;
-        float xc = tr.offsetX * scaleX - centerX * sizingX;
+
+        //        float xc = ((tr.getRegionWidth() + tr.offsetX) * fsx - font.cellWidth) * scale * sizingX;
+        //// This rotates around the center, but fails with box drawing. Underlines are also off, unless adjusted.
+//        float xc = (font.cellWidth * 0.5f - (tr.getRegionWidth() + tr.offsetX) * fsx) * scale * sizingX;
+        //// This works(*) with box-drawing chars, but rotates around halfway up the left edge, not the center.
+        //// It does have the same sliding issue as the other methods so far.
+//        float xc = (font.cellWidth * -0.5f) * sizingX;// + (tr.offsetX * scaleX * sizingX);
+        float xc = (tr.offsetX * scaleX * sizingX) - cos * centerX - cellWidth * 0.5f;//0f;//-centerX;
+//        float xc = tr.offsetX * scaleX - centerX * sizingX;
+//        float xc = (cos * tr.offsetX - sin * tr.offsetY) * scaleX - centerX * sizingX;
+        //// ???
+//        float xc = (centerX - (tr.getRegionWidth() + tr.offsetX) * fsx) * scale * sizingX;
+
         float trrh = tr.getRegionHeight();
+        float yt = (font.originalCellHeight - (trrh + tr.offsetY)) * fsy * scale * sizingY - centerY + sin * centerX;
+
         float h = trrh * scaleY * sizingY;
-        float yt = (font.cellHeight * 0.5f - (trrh + tr.offsetY) * fsy) * scale * sizingY;
+//                yt = (font.cellHeight * 0.5f - (trrh + tr.offsetY) * fsy) * scale * sizingY;
+
 //        float yt = (font.originalCellHeight * 0.5f - trrh - tr.offsetY) * scaleY * sizingY;
 //        float yt = cellHeight * font.scaleY * 0.5f - (tr.getRegionHeight() + tr.offsetY) * scaleY * sizingY;
 //        float yt = centerY * sizingY - (tr.getRegionHeight() + tr.offsetY) * scaleY * sizingY;
@@ -3369,15 +4124,54 @@ public class Font implements Disposable {
         u2 = tr.getU2();
         v2 = tr.getV2();
 
+
+        if (c >= 0xE000 && c < 0xF800) {
+            // for inline images, this does two things.
+            // it moves the changes from the inline image's offsetX and offsetY from the
+            // rotating xc and yt variables, to the position-only x and y variables.
+            // it also offsets x by a half-cell to the right, and moves the origin for y.
+            float xch = tr.offsetX * scaleX * sizingX;
+            float ych = scaledHeight * 0.5f - tr.offsetY * font.scaleY * scale * sizingY;
+            xc -= xch;
+            x += xch + changedW * 0.5f;
+            yt -= ych;
+            y += ych;// - font.descent * font.scaleY * 0.5f;
+        }
+        // when this is removed, rotations for icons go around the bottom center.
+        // but, with it here, the rotations go around the bottom left corner.
+//            xc += (changedW * 0.5f);
+
+        // This seems to rotate icons around their centers.
+//            x += changedW * 0.5f;
+//            y += scaledHeight * 0.5f;
+//            yt -= scaledHeight * 0.5f;
+
+//            yt = font.handleIntegerPosition(yt - font.descent * osy * 0.5f);
+
+
+
 //        if (c >= 0xE000 && c < 0xF800) {
-//            yt = handleIntegerPosition(font.originalCellHeight * 0.5f - tr.xAdvance - tr.offsetX) * scaleY * sizingY;
-//                    //(-cellHeight * scale * sizingY + centerY);
+//            yt = (font.cellHeight * 0.5f - (trrh + tr.offsetY) * fsy) * scale * sizingY;
+
+//            yt = (font.cellHeight) * scale * sizingY * -0.5f;
+
+//            yt = (font.cellHeight * -0.5f + (font.cellHeight - tr.offsetY) * font.scaleY) * scale * sizingY;
+
+
+//            yt = -font.descent * scale * font.scaleY - font.cellHeight * scale * sizingY * 0.5f;
+//            h = (font.cellHeight * scale) * sizingY;
+//            yt = handleIntegerPosition((font.cellHeight * 0.5f - (trrh + tr.offsetY) * fsy + font.descent * font.scaleY) * scale * sizingY);
 //        }
 
+        // leaving this in commented because it can be useful to quickly get info on a particular char
+//        if(c == 57863) // floppy disk
+//            System.out.println("floppy disk: " + yt + ", font.cellHeight: " + font.cellHeight + ", trrh: " + trrh + ", tr.offsetY: " + tr.offsetY + ", fsy: "+ fsy + ", scale: " + scale + ", sizingY: " + sizingY + ", descent: " + font.descent);
+
         if ((glyph & OBLIQUE) != 0L) {
-            x0 += h * 0.2f;
-            x1 -= h * 0.2f;
-            x2 -= h * 0.2f;
+            final float amount = h * obliqueStrength * 0.2f;
+            x0 += amount;
+            x1 -= amount;
+            x2 -= amount;
         }
         final long script = (glyph & SUPERSCRIPT);
         if (script == SUPERSCRIPT) {
@@ -3396,33 +4190,33 @@ public class Font implements Disposable {
             w *= 0.5f;
             h *= 0.5f;
             yt = yt * 0.625f; //scaledHeight * 0.625f - h - tr.offsetY * scaleY * 0.5f - centerY * scale * sizingY;
-            y1 -= scaledHeight * 0.125f;
-            y2 -= scaledHeight * 0.125f;
-            y0 -= scaledHeight * 0.125f;
+            y1 -= scaledHeight * 0.375f;
+            y2 -= scaledHeight * 0.375f;
+            y0 -= scaledHeight * 0.375f;
             if (!font.isMono)
                 changedW *= 0.5f;
         } else if (script == MIDSCRIPT) {
             w *= 0.5f;
             h *= 0.5f;
             yt = yt * 0.625f; //scaledHeight * 0.625f - h - tr.offsetY * scaleY * 0.5f - centerY * scale * sizingY;
-            y0 += scaledHeight * 0.125f;
-            y1 += scaledHeight * 0.125f;
-            y2 += scaledHeight * 0.125f;
+//            y0 += scaledHeight * 0.125f;
+//            y1 += scaledHeight * 0.125f;
+//            y2 += scaledHeight * 0.125f;
             if (!font.isMono)
                 changedW *= 0.5f;
         }
 
         if(backgroundColor != 0) {
-            drawBlockSequence(batch, BlockUtils.BOX_DRAWING[0x88], font.mapping.get(solidBlock, tr),
+            drawBlockSequence(batch, BlockUtils.BOX_DRAWING[0x88], font.mapping.get(font.solidBlock, tr),
                     NumberUtils.intToFloatColor(Integer.reverseBytes(backgroundColor)),
-                    x - xAdvance * scaleX * (sizingX - 0.5f) + atlasOffX + tr.offsetX * scaleX * 0.5f,
-                    y + font.descent * scaleY * sizingY + atlasOffY,
-                    xAdvance * scaleX * sizingX + 5f, (cellHeight * scale - font.descent * scaleY) * sizingY, rotation);
+                    x - font.cellWidth * scale * 0.5f,// - (xAdvance * scaleX * (sizingX - 0.5f) + tr.offsetX * scaleX) * 0.5f,
+                    y + font.descent * scaleY * sizingY,// - (font.cellHeight * scale + font.descent * osy) * 0.5f * sizingY,
+                    xAdvance * scaleX * sizingX + 5f, (font.cellHeight * scale) * sizingY, rotation);
         }
         if (jostled) {
-            int code = NumberUtils.floatToIntBits(x * 1.8191725133961645f + y * 1.6710436067037893f + c * 1.5497004779019703f) >>> 8;
+            int code = NumberUtils.floatToIntBits(x * 1.8191725133961645f + y * 1.6710436067037893f + c * 1.5497004779019703f) & 0xFFFFFF;
             xc += code % 5 - 2f;
-            y += (code >>> 6) % 5 - 2f;
+            yt += (code >>> 6) % 5 - 2f;
 //            int code = (NumberUtils.floatToIntBits(x + y) >>> 16 ^ c);
 //            drawBlockSequence(batch, BlockUtils.BOX_DRAWING[(code % 0x6D)],
 //                    font.mapping.get(solidBlock, tr), color,
@@ -3459,7 +4253,8 @@ public class Font implements Disposable {
         vertices[19] = v;
 
         if((glyph & ALTERNATE_MODES_MASK) == DROP_SHADOW) {
-            float shadow = -0x0.444444p-126f;//equal to NumberUtils.intBitsToFloat(0x80222222); (dark transparent gray)
+//            float shadow = Color.toFloatBits(0.1333f, 0.1333f, 0.1333f, 0.5f);// (dark transparent gray, as batch alpha is lowered, this gets more transparent)
+            float shadow = ColorUtils.multiplyAlpha(PACKED_SHADOW_COLOR, batch.getColor().a);// (dark transparent gray, as batch alpha is lowered, this gets more transparent)
             vertices[2] = shadow;
             vertices[7] = shadow;
             vertices[12] = shadow;
@@ -3468,31 +4263,34 @@ public class Font implements Disposable {
             vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y + 1)) - (vertices[5] = (x + cos * p1x - sin * p1y + 1)) + (vertices[10] = (x + cos * p2x - sin * p2y + 1)));
             vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y - 2)) - (vertices[6] = (y + sin * p1x + cos * p1y - 2)) + (vertices[11] = (y + sin * p2x + cos * p2y - 2)));
 
-            batch.draw(tex, vertices, 0, 20);
+            drawVertices(batch, tex, vertices);
         }
         else if((glyph & ALTERNATE_MODES_MASK) == BLACK_OUTLINE || (glyph & ALTERNATE_MODES_MASK) == WHITE_OUTLINE) {
-            float outline = (glyph & ALTERNATE_MODES_MASK) == BLACK_OUTLINE
-                    ? -0X1.0P125f // black
-                    : -0X1.FFFFFEP126f; // white
+            float outline = ColorUtils.multiplyAlpha((glyph & ALTERNATE_MODES_MASK) == BLACK_OUTLINE
+                    ? PACKED_BLACK // black
+                    : PACKED_WHITE, batch.getColor().a); // white
             vertices[2] = outline;
             vertices[7] = outline;
             vertices[12] = outline;
             vertices[17] = outline;
             int widthAdj = ((glyph & BOLD) != 0L) ? 2 : 1;
             for (int xi = -widthAdj; xi <= widthAdj; xi++) {
-                float xa = xi*xPx;
+                float xa = xi * xPx;
+                if(widthAdj == 2 && (xi > 0 || boldStrength >= 1f)) xa *= boldStrength;
                 for (int yi = -1; yi <= 1; yi++) {
                     if(xi == 0 && yi == 0) continue;
-                    float ya = yi*yPx;
-                    vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y + xa)) - (vertices[5] = (x + cos * p1x - sin * p1y + xa)) + (vertices[10] = (x + cos * p2x - sin * p2y + xa)));
-                    vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y + ya)) - (vertices[6] = (y + sin * p1x + cos * p1y + ya)) + (vertices[11] = (y + sin * p2x + cos * p2y + ya)));
+                    float ya = yi * yPx;
+//                    vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y + xa)) - (vertices[5] = (x + cos * p1x - sin * p1y + xa)) + (vertices[10] = (x + cos * p2x - sin * p2y + xa)));
+//                    vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y + ya)) - (vertices[6] = (y + sin * p1x + cos * p1y + ya)) + (vertices[11] = (y + sin * p2x + cos * p2y + ya)));
+                    vertices[15] = (vertices[0] = font.handleIntegerPosition(x + cos * p0x - sin * p0y + xa)) - (vertices[5] = font.handleIntegerPosition(x + cos * p1x - sin * p1y + xa)) + (vertices[10] = font.handleIntegerPosition(x + cos * p2x - sin * p2y + xa));
+                    vertices[16] = (vertices[1] = font.handleIntegerPosition(y + sin * p0x + cos * p0y + ya)) - (vertices[6] = font.handleIntegerPosition(y + sin * p1x + cos * p1y + ya)) + (vertices[11] = font.handleIntegerPosition(y + sin * p2x + cos * p2y + ya));
 
-                    batch.draw(tex, vertices, 0, 20);
+                    drawVertices(batch, tex, vertices);
                 }
             }
         }
         else if((glyph & ALTERNATE_MODES_MASK) == SHINY) {
-            float shine = -0X1.FFFFFEP126f; // white
+            float shine = ColorUtils.multiplyAlpha(PACKED_WHITE, batch.getColor().a);
             vertices[2] = shine;
             vertices[7] = shine;
             vertices[12] = shine;
@@ -3500,11 +4298,12 @@ public class Font implements Disposable {
             int widthAdj = ((glyph & BOLD) != 0L) ? 1 : 0;
             for (int xi = -widthAdj; xi <= widthAdj; xi++) {
                 float xa = xi * xPx;
+                if(widthAdj == 1 && (xi > 0 || boldStrength >= 1f)) xa *= boldStrength;
                 float ya = 1.5f * yPx;
                 vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y + xa)) - (vertices[5] = (x + cos * p1x - sin * p1y + xa)) + (vertices[10] = (x + cos * p2x - sin * p2y + xa)));
                 vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y + ya)) - (vertices[6] = (y + sin * p1x + cos * p1y + ya)) + (vertices[11] = (y + sin * p2x + cos * p2y + ya)));
 
-                batch.draw(tex, vertices, 0, 20);
+                drawVertices(batch, tex, vertices);
             }
         }
 
@@ -3514,62 +4313,149 @@ public class Font implements Disposable {
         vertices[12] = color;
         vertices[17] = color;
 
-        vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
-        vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
+//        vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
+//        vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
+        vertices[15] = (vertices[0] = font.handleIntegerPosition(x + cos * p0x - sin * p0y)) - (vertices[5] = font.handleIntegerPosition(x + cos * p1x - sin * p1y)) + (vertices[10] = font.handleIntegerPosition(x + cos * p2x - sin * p2y));
+        vertices[16] = (vertices[1] = font.handleIntegerPosition(y + sin * p0x + cos * p0y)) - (vertices[6] = font.handleIntegerPosition(y + sin * p1x + cos * p1y)) + (vertices[11] = font.handleIntegerPosition(y + sin * p2x + cos * p2y));
 
-        batch.draw(tex, vertices, 0, 20);
+        drawVertices(batch, tex, vertices);
+
+        // This is the "emergency debug code" to get as much info as possible about a glyph when it prints.
+//        if(c >= 0xE000 && c < 0xF800) {
+//            System.out.println("With font " + font.name + ", drawing glyph " + namesByCharCode.get(c, "") +
+//                    ", it has v0: " + vertices[0] + ", v1: " + vertices[1] +
+//                    ", x: " + x + ", y: " + y + ", p0x: " + p0x + ", p0y: " + p0y +
+//                    ", h: " + h + ", xc: " + xc + ", yt: " + yt +
+//                    ", font.descent: " + font.descent + ", osy: " + osy +
+//                    ", tr.offsetX: " + tr.offsetX + ", tr.offsetY: " + tr.offsetY + ", tr.xAdvance: " + tr.xAdvance);
+//        }
+
         if ((glyph & BOLD) != 0L) {
-            p0x += 1f;
-            p1x += 1f;
-            p2x += 1f;
-            vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
-            vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
-            batch.draw(tex, vertices, 0, 20);
-            p0x -= 2f;
-            p1x -= 2f;
-            p2x -= 2f;
-            vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
-            vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
-            batch.draw(tex, vertices, 0, 20);
-            p0x += 0.5f;
-            p1x += 0.5f;
-            p2x += 0.5f;
-            vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
-            vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
-            batch.draw(tex, vertices, 0, 20);
-            p0x += 1f;
-            p1x += 1f;
-            p2x += 1f;
-            vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
-            vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
-            batch.draw(tex, vertices, 0, 20);
+            final float old0 = p0x;
+            final float old1 = p1x;
+            final float old2 = p2x;
+            float leftStrength = (this.boldStrength >= 1f) ? this.boldStrength : 0f;
+            float rightStrength = (this.boldStrength >= 0f) ? 1f : 0f;
+            if (rightStrength != 0f) {
+                p0x = old0 + rightStrength;
+                p1x = old1 + rightStrength;
+                p2x = old2 + rightStrength;
+                vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
+                vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
+                drawVertices(batch, tex, vertices);
+                p0x = old0 + rightStrength * 0.5f;
+                p1x = old1 + rightStrength * 0.5f;
+                p2x = old2 + rightStrength * 0.5f;
+                vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
+                vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
+                drawVertices(batch, tex, vertices);
+            }
+            if (leftStrength != 0f) {
+                p0x = old0 - leftStrength;
+                p1x = old1 - leftStrength;
+                p2x = old2 - leftStrength;
+                vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
+                vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
+                drawVertices(batch, tex, vertices);
+                p0x = old0 - leftStrength * 0.5f;
+                p1x = old1 - leftStrength * 0.5f;
+                p2x = old2 - leftStrength * 0.5f;
+                vertices[15] = ((vertices[0] = (x + cos * p0x - sin * p0y)) - (vertices[5] = (x + cos * p1x - sin * p1y)) + (vertices[10] = (x + cos * p2x - sin * p2y)));
+                vertices[16] = ((vertices[1] = (y + sin * p0x + cos * p0y)) - (vertices[6] = (y + sin * p1x + cos * p1y)) + (vertices[11] = (y + sin * p2x + cos * p2y)));
+                drawVertices(batch, tex, vertices);
+            }
         }
+
+        // this changes scaleCorrection from one that uses fsx to one that uses font.scaleY.
+        // fsx and font.scaleY are equivalent for most glyphs, but not for inline images.
+        oy -= scaleCorrection;
+        oy += font.descent * font.scaleY * 2f;// - font.descent * osy;
+
         if ((glyph & UNDERLINE) != 0L) {
+            ix = font.handleIntegerPosition(ox + oCenterX);
+            iy = font.handleIntegerPosition(oy + oCenterY);
+            xShift = (ox + oCenterX) - (ix);
+            yShift = (oy + oCenterY) - (iy);
+            x = font.handleIntegerPosition(ix + xShift);
+            y = font.handleIntegerPosition(iy + yShift);
+            centerX = oCenterX + xShift * 0.5f;
+            centerY = oCenterY + yShift * 0.5f;
+            x += cellWidth * 0.5f;
+//            x += centerX;
+//            x -= centerX;
+//            y -= centerY;
+            //x += centerX * cos; y += centerX * sin;
+            if (c >= 0xE000 && c < 0xF800) {
+                y -= (scaledHeight * 0.5f);
+            }
             GlyphRegion under = font.mapping.get(0x2500);
             if (under != null && under.offsetX != under.offsetX) {
-                p0x = -centerX;
-                p0y = -0.8125f * cellHeight * scale;
-                drawBlockSequence(batch, BlockUtils.BOX_DRAWING[0], font.mapping.get(solidBlock, tr), color,
-                        x + cos * p0x - sin * p0y, y + (sin * p0x + cos * p0y),
-                        xAdvance * scaleX * sizingX + 2, cellHeight * scale * sizingY, rotation);
+                p0x = font.cellWidth * -0.5f - scale * fsx + xAdvance * font.underX * scaleX;
+                p0y = ((font.underY - 0.8125f) * font.cellHeight) * scale * sizingY + centerY
+                        + font.descent * font.scaleY;
+                if (c >= 0xE000 && c < 0xF800)
+                {
+                    p0x -= xPx * 2f - (changedW * 0.5f);
+                    p0y += scaledHeight * 0.5f;
+                }
+                else
+                {
+                    p0x += xPx + centerX - cos * centerX;
+                    p0y += sin * centerX;
+                }
+                if (c >= 0xE000 && c < 0xF800) {
+                    // for inline images, this does two things.
+                    // it moves the changes from the inline image's offsetX and offsetY from the
+                    // rotating xc and yt variables, to the position-only x and y variables.
+                    // it also moves the origin for y by a full cell height.
+                    float xch = tr.offsetX * scaleX * sizingX;
+                    float ych = scaledHeight -tr.offsetY * fsy * scale * sizingY;
+                    p0x -= xch;
+                    x += xch;
+                    p0y -= ych;
+                    y += ych;// - font.descent * font.scaleY * 2f;
+                }
+
+//                p0x = centerX - cos * centerX - cellWidth * 0.5f - scale * fsx + xAdvance * font.underX * scaleX;
+//                p0y = ((font.underY - 0.8125f) * font.cellHeight) * scale * sizingY + centerY + sin * centerX
+//                        + font.descent * font.scaleY;
+
+//                    p0x = xc + (changedW * 0.5f) + cellWidth * font.underX * scale;
+//                    p0y = font.handleIntegerPosition(yt + font.underY * font.cellHeight * scale * sizingY);
+                drawBlockSequence(batch, BlockUtils.BOX_DRAWING[0], font.mapping.get(font.solidBlock, tr), color,
+                        x + (cos * p0x - sin * p0y), y + (sin * p0x + cos * p0y),
+                        xAdvance * (font.underLength+1) * scaleX + xPx * 5f,
+                        font.cellHeight * scale * sizingY * (1f + font.underBreadth), rotation);
             } else {
                 under = font.mapping.get('_');
                 if (under != null) {
                     trrh = under.getRegionHeight();
-                    h = trrh * scaleY * sizingY;
-                    yt = (font.originalCellHeight * 0.5f - trrh - under.offsetY) * scaleY * sizingY;
-                    if (c >= 0xE000 && c < 0xF800) {
-                        yt = handleIntegerPosition(-centerY * scale * sizingY);
-                    }
-
-                    final float underU = under.getU() + (under.xAdvance - under.offsetX) * iw * 0.5f,
+                    h = trrh * osy * sizingY + cellHeight * font.underBreadth * scale * sizingY;
+                    yt = (centerY - (trrh + under.offsetY) * font.scaleY) * scale * sizingY
+                            + cellHeight * font.underY * scale * sizingY;
+                    //((font.originalCellHeight * 0.5f - trrh - under.offsetY) * scaleY - 0.5f * imageAdjust * scale) * sizingY;
+//                    if (c >= 0xE000 && c < 0xF800) {
+//                        yt = font.handleIntegerPosition(yt - font.descent * osy * 0.5f /* - font.cellHeight * scale */);
+//                    }
+                    final float underU = (under.getU() + under.getU2()) * 0.5f - iw,
                             underV = under.getV(),
                             underU2 = underU + iw,
                             underV2 = under.getV2();
 //                            hu = under.getRegionHeight() * scaleY,
 //                            yu = -0.625f * (hu + under.offsetY * scaleY);//-0.55f * cellHeight * scale;//cellHeight * scale - hu - under.offsetY * scaleY - centerY;
-                    xc = under.offsetX * scaleX - centerX * scale;
-                    x0 = -scaleX * under.offsetX - scale;
+                    xc = -0.5f * cellWidth + changedW * font.underX - scale * fsx;
+                    x0 = -2 * xPx;
+                    float addW = xPx * 2;
+    //p0x = - cellWidth * 0.5f - scale * fsx + xAdvance * font.underX * scaleX;
+    //p0y = ((font.underY - 0.8125f) * font.cellHeight) * scale * sizingY + centerY + font.descent * font.scaleY;
+                    if (c >= 0xE000 && c < 0xF800) {
+                        x0 -= xPx * 5f + (changedW * 0.5f);
+                        yt += scaledHeight * 0.5f;
+                    }
+                    else {
+                        x0 += xPx + centerX - cos * centerX;
+                        yt += sin * centerX;
+                    }
                     vertices[2] = color;
                     vertices[3] = underU;
                     vertices[4] = underV;
@@ -3586,45 +4472,112 @@ public class Font implements Disposable {
                     vertices[18] = underU2;
                     vertices[19] = underV;
 
-                    p0x = xc + x0 - scale;
+                    p0x = xc + x0 - addW;
                     p0y = yt + y0 + h;//yu + hu;
-                    p1x = xc + x0 - scale;
+                    p1x = xc + x0 - addW;
                     p1y = yt + y1;//yu;
-                    p2x = xc + x0 + changedW + scale;
+                    p2x = xc + x0 + changedW * (font.underLength + 1f) + addW;
                     p2y = yt + y2;//yu;
                     vertices[15] = (vertices[0] = x + cos * p0x - sin * p0y) - (vertices[5] = x + cos * p1x - sin * p1y) + (vertices[10] = x + cos * p2x - sin * p2y);
                     vertices[16] = (vertices[1] = y + sin * p0x + cos * p0y) - (vertices[6] = y + sin * p1x + cos * p1y) + (vertices[11] = y + sin * p2x + cos * p2y);
 
-                    batch.draw(under.getTexture(), vertices, 0, 20);
+                    drawVertices(batch, under.getTexture(), vertices);
                 }
             }
         }
         if ((glyph & STRIKETHROUGH) != 0L) {
+            ix = font.handleIntegerPosition(ox + oCenterX);
+            iy = font.handleIntegerPosition(oy + oCenterY);
+            xShift = (ox + oCenterX) - (ix);
+            yShift = (oy + oCenterY) - (iy);
+            x = font.handleIntegerPosition(ix + xShift);
+            y = font.handleIntegerPosition(iy + yShift);
+            centerX = oCenterX + xShift * 0.5f;
+            centerY = oCenterY + yShift * 0.5f;
+            x += cellWidth * 0.5f;
+//            x -= centerX;
+//            y -= centerY;
+            //x += centerX * cos; y += centerX * sin;
+//            if (c >= 0xE000 && c < 0xF800) {
+//                x += (changedW * 0.5f);
+//            }
+//            if (c >= 0xE000 && c < 0xF800) {
+//                y += (scaledHeight * 0.5f);
+//                x += (changedW * 0.5f);
+//            }
+            if (c >= 0xE000 && c < 0xF800) {
+                y -= (scaledHeight * 0.5f);
+            }
+
             GlyphRegion dash = font.mapping.get(0x2500);
             if (dash != null && dash.offsetX != dash.offsetX) {
-                p0x = -centerX;
-                p0y = -0.375f * cellHeight * scale;
-                drawBlockSequence(batch, BlockUtils.BOX_DRAWING[0], font.mapping.get(solidBlock, tr), color,
+                p0x = font.cellWidth * -0.5f - scale * fsx + xAdvance * font.strikeX * scaleX;
+                p0y = centerY + (font.strikeY - 0.45f) * font.cellHeight * scale * sizingY + font.descent * font.scaleY;
+//                p0x = centerX - cos * centerX - cellWidth * 0.5f - scale * fsx + xAdvance * font.strikeX * scaleX;
+//                p0y = centerY + (font.strikeY - 0.45f) * font.cellHeight * scale * sizingY + sin * centerX + font.descent * font.scaleY;
+                if (c >= 0xE000 && c < 0xF800) {
+                    p0x -= xPx * 2f - (changedW * 0.5f);
+                    p0y += scaledHeight * 0.5f;
+                }
+                else {
+                    p0x += xPx + centerX - cos * centerX;
+                    p0y += sin * centerX;
+                }
+                if (c >= 0xE000 && c < 0xF800) {
+                    // for inline images, this does two things.
+                    // it moves the changes from the inline image's offsetX and offsetY from the
+                    // rotating xc and yt variables, to the position-only x and y variables.
+                    // it also moves the origin for y by a full cell height.
+                    float xch = tr.offsetX * scaleX * sizingX;
+                    float ych = scaledHeight -tr.offsetY * fsy * scale * sizingY;
+                    p0x -= xch;
+                    x += xch;
+                    p0y -= ych;
+                    y += ych;// - font.descent * font.scaleY * 2f;
+                }
+                drawBlockSequence(batch, BlockUtils.BOX_DRAWING[0], font.mapping.get(font.solidBlock, tr), color,
                         x + cos * p0x - sin * p0y, y + (sin * p0x + cos * p0y),
-                        xAdvance * scaleX * sizingX + 2, cellHeight * scale * sizingY, rotation);
+                        xAdvance * (font.strikeLength + 1) * scaleX + xPx * 5f,
+                        (1f + font.strikeBreadth) * font.cellHeight * scale * sizingY, rotation);
             } else {
                 dash = font.mapping.get('-');
                 if (dash != null) {
                     trrh = dash.getRegionHeight();
-                    h = trrh * scaleY * sizingY;
-                    yt = (font.originalCellHeight * 0.5f - trrh - dash.offsetY) * scaleY * sizingY;
-                    if (c >= 0xE000 && c < 0xF800) {
-                        yt = handleIntegerPosition(-centerY * scale * sizingY);
-                    }
+                    h = trrh * osy * sizingY * (1f + font.strikeBreadth);
 
-                    final float dashU = dash.getU() + (dash.xAdvance - dash.offsetX) * iw * 0.5f,
+//                    if (c >= 0xE000 && c < 0xF800)
+//                        yt = handleIntegerPosition((-centerY + imageAdjust) * scale * 0.5f * sizingY);
+
+                    yt = (centerY - (trrh + dash.offsetY) * font.scaleY) * scale * sizingY
+                            + font.cellHeight * font.strikeY * scale * sizingY;
+//                    yt = (font.cellHeight * 0.5f - (trrh + dash.offsetY) * font.scaleY) * scale * sizingY;
+                    //((font.originalCellHeight * 0.5f - trrh - dash.offsetY) * scaleY) * sizingY;
+//                    if (c >= 0xE000 && c < 0xF800) {
+//                        yt = font.handleIntegerPosition(yt - font.descent * osy * 0.5f /* - font.cellHeight * scale */);
+//                    }
+
+//                    if (c >= 0xE000 && c < 0xF800)
+//                        System.out.println("With font " + name + ", STRIKETHROUGH: yt=" + yt);
+
+                    //dashU = dash.getU() + (dash.xAdvance - dash.offsetX) * iw * 0.625f,
+                    final float dashU = (dash.getU() + dash.getU2()) * 0.5f - iw,
                             dashV = dash.getV(),
                             dashU2 = dashU + iw,
                             dashV2 = dash.getV2();
 //                            hd = dash.getRegionHeight() * scaleY,
 //                            yd = -0.5f * cellHeight * scale;//cellHeight * scale - hd - dash.offsetY * scaleY - centerY;
-                    xc = dash.offsetX * scaleX - centerX * scale;
-                    x0 = -scaleX * dash.offsetX - scale;
+                    xc = -cellWidth * 0.5f + changedW * font.strikeX - scale * fsx;
+                    x0 = -2 * xPx;
+                    float addW = xPx * 2;
+                    if (c >= 0xE000 && c < 0xF800) {
+                        x0 -= xPx * 5f + (changedW * 0.5f);
+                        yt += scaledHeight * 0.5f;
+                    }
+                    else {
+                        x0 += xPx + centerX - cos * centerX;
+                        yt += sin * centerX;
+                    }
+
                     vertices[2] = color;
                     vertices[3] = dashU;
                     vertices[4] = dashV;
@@ -3641,36 +4594,70 @@ public class Font implements Disposable {
                     vertices[18] = dashU2;
                     vertices[19] = dashV;
 
-                    p0x = xc + x0 - scale;
+                    p0x = xc + x0 - addW;
                     p0y = yt + y0 + h;//yd + hd;
-                    p1x = xc + x0 - scale;
+                    p1x = xc + x0 - addW;
                     p1y = yt + y1;//yd;
-                    p2x = xc + x0 + changedW + scale;
+                    p2x = xc + x0 + changedW * (font.strikeLength + 1f) + addW;
                     p2y = yt + y2;//yd;
                     vertices[15] = (vertices[0] = x + cos * p0x - sin * p0y) - (vertices[5] = x + cos * p1x - sin * p1y) + (vertices[10] = x + cos * p2x - sin * p2y);
                     vertices[16] = (vertices[1] = y + sin * p0x + cos * p0y) - (vertices[6] = y + sin * p1x + cos * p1y) + (vertices[11] = y + sin * p2x + cos * p2y);
+//                    vertices[15] = (vertices[0] = handleIntegerPosition(x + cos * p0x - sin * p0y)) - (vertices[5] = handleIntegerPosition(x + cos * p1x - sin * p1y)) + (vertices[10] = handleIntegerPosition(x + cos * p2x - sin * p2y));
+//                    vertices[16] = (vertices[1] = handleIntegerPosition(y + sin * p0x + cos * p0y)) - (vertices[6] = handleIntegerPosition(y + sin * p1x + cos * p1y)) + (vertices[11] = handleIntegerPosition(y + sin * p2x + cos * p2y));
 
-                    batch.draw(dash.getTexture(), vertices, 0, 20);
+                    drawVertices(batch, dash.getTexture(), vertices);
                 }
             }
         }
         // checks for error, warn, and note modes
         if((glyph & ALTERNATE_MODES_MASK) >= ERROR) {
-            p0x = -centerX;
-            p0y = -4f * centerY;
+            ix = font.handleIntegerPosition(ox + oCenterX);
+            iy = font.handleIntegerPosition(oy + oCenterY);
+            xShift = (ox + oCenterX) - (ix);
+            yShift = (oy + oCenterY) - (iy);
+            x = font.handleIntegerPosition(ix + xShift);
+            y = font.handleIntegerPosition(iy + yShift);
+            centerX = oCenterX + xShift * 0.5f;
+            centerY = oCenterY + yShift * 0.5f;
+//            x += cellWidth * 0.5f;
+            if (c >= 0xE000 && c < 0xF800) {
+                x += (changedW * 0.5f);
+//                y += scaledHeight * 0.5f;
+            }
+
+            p0x = -cos * centerX + changedW * (font.fancyX);
+            p0y = -(centerY - font.descent * font.scaleY * 0.75f) * (scale * sizingY - font.fancyY) + sin * centerX;
+
+//            p0x = -cellWidth + xAdvance * font.underX * scaleX;
+//            p0y = ((font.underY - 0.75f) * font.cellHeight) * scale * sizingY + centerY;
+            if (c >= 0xE000 && c < 0xF800)
+            {
+                p0x -= changedW * 0.25f - xPx * 2f;
+//                p0y += scaledHeight * 0.5f;
+            }
+//            else
+//            {
+//                p0x += xPx + centerX - cos * centerX;
+//                p0y += sin * centerX;
+//            }
+
             drawFancyLine(batch, (glyph & ALTERNATE_MODES_MASK),
-                    x + cos * p0x - sin * p0y, y + (sin * p0x + cos * p0y), xAdvance * scaleX, xPx, yPx, rotation);
+                    x + (cos * p0x - sin * p0y), y + (sin * p0x + cos * p0y),
+                    changedW * (1f + underLength), xPx, yPx, rotation);
+
         }
+//        if (c >= 0xE000 && c < 0xF800)
+//            changedW *= 1.25f;
         return changedW;
     }
 
     /**
      * Reads markup from text, along with the chars to receive markup, processes it, and appends into appendTo, which is
-     * a {@link Layout} holding one or more {@link Line}s. A common way of getting a Layout is with
-     * {@code Layout.POOL.obtain()}; you can free the Layout when you are done using it with {@link Pool#free(Object)}
-     * on {@link Layout#POOL}. This parses an extension of libGDX markup and uses it to determine color, size, position,
-     * shape, strikethrough, underline, case, and scale of the given CharSequence. It also reads typing markup, for
-     * effects, but passes it through without changing it and without considering it for line wrapping or text position.
+     * a {@link Layout} holding one or more {@link Line}s. This parses an extension of libGDX markup and uses it to
+     * determine color, size, position, shape, strikethrough, underline, case, and scale of the given CharSequence.
+     * It also reads typing markup, for effects, but passes it through without changing it and without considering it
+     * for line wrapping or text position.
+     * <br>
      * The text drawn will start in {@code appendTo}'s {@link Layout#baseColor}, which is usually white, with the normal
      * size as determined by the font's metrics and scale ({@link #scaleX} and {@link #scaleY}), normal case, and
      * without bold, italic, superscript, subscript, strikethrough, or underline. Markup starts with {@code [}; the next
@@ -3734,24 +4721,37 @@ public class Font implements Disposable {
             appendTo.clear();
             appendTo.font(this);
         }
-//        appendTo.pushLine();
         appendTo.peekLine().height = 0;
         float targetWidth = appendTo.getTargetWidth();
         int kern = -1;
+        historyBuffer.clear();
+
         for (int i = 0, n = text.length(); i < n; i++) {
             scaleX = font.scaleX * (scale + 1) * 0.25f;
 
             //// CURLY BRACKETS
 
-            if (text.charAt(i) == '{' && i + 1 < n && text.charAt(i + 1) != '{') {
+            if (omitCurlyBraces && text.charAt(i) == '{' && i + 1 < n && text.charAt(i + 1) != '{') {
                 int start = i;
-                int sizeChange = -1, fontChange = -1;
+                int sizeChange = -1, fontChange = -1, innerSquareStart = -1, innerSquareEnd = -1;
                 int end = text.indexOf('}', i);
                 if (end == -1) end = text.length();
                 int eq = end;
                 for (; i < n && i <= end; i++) {
                     c = text.charAt(i);
-                    appendTo.add(current | c);
+                    if (enableSquareBrackets && c == '[' && i < end && text.charAt(i + 1) == '+') innerSquareStart = i;
+                    else if (innerSquareStart == -1) appendTo.add(current | c);
+                    if (enableSquareBrackets && c == ']') {
+                        innerSquareEnd = i;
+                        if (innerSquareStart != -1 && font.nameLookup != null) {
+                            int len = innerSquareEnd - innerSquareStart;
+                            if (len >= 2) {
+                                c = font.nameLookup.get(safeSubstring(text, innerSquareStart + 2, innerSquareEnd), '+');
+                                innerSquareStart = -1;
+                                appendTo.add(current | c);
+                            }
+                        }
+                    }
                     if (c == '@') fontChange = i;
                     else if (c == '%') sizeChange = i;
                     else if (c == '?') sizeChange = -1;
@@ -3760,6 +4760,7 @@ public class Font implements Disposable {
                 }
                 char after = eq + 1 >= end ? '\u0000' : text.charAt(eq + 1);
                 if (start + 1 == end || "RESET".equalsIgnoreCase(safeSubstring(text, start + 1, end))) {
+                    historyBuffer.add(current);
                     scale = 3;
                     font = this;
                     fontIndex = 0;
@@ -3767,18 +4768,21 @@ public class Font implements Disposable {
                 } else if (after == '^' || after == '=' || after == '.') {
                     switch (after) {
                         case '^':
+//                            historyBuffer.add(current);
                             if ((current & SUPERSCRIPT) == SUPERSCRIPT)
                                 current &= ~SUPERSCRIPT;
                             else
                                 current |= SUPERSCRIPT;
                             break;
                         case '.':
+//                            historyBuffer.add(current);
                             if ((current & SUPERSCRIPT) == SUBSCRIPT)
                                 current &= ~SUBSCRIPT;
                             else
                                 current = (current & ~SUPERSCRIPT) | SUBSCRIPT;
                             break;
                         case '=':
+//                            historyBuffer.add(current);
                             if ((current & SUPERSCRIPT) == MIDSCRIPT)
                                 current &= ~MIDSCRIPT;
                             else
@@ -3786,6 +4790,7 @@ public class Font implements Disposable {
                             break;
                     }
                 } else if (fontChange >= 0 && family != null) {
+//                    historyBuffer.add(current);
                     fontIndex = family.fontAliases.get(safeSubstring(text, fontChange + 1, end), -1);
                     if (fontIndex == -1) {
                         font = this;
@@ -3798,6 +4803,7 @@ public class Font implements Disposable {
                         }
                     }
                 } else if (sizeChange >= 0) {
+//                    historyBuffer.add(current);
                     if (sizeChange + 1 == end) {
                         if (eq + 1 == sizeChange) {
                             scale = 3;
@@ -3808,23 +4814,40 @@ public class Font implements Disposable {
                         scale = ((intFromDec(text, sizeChange + 1, end) - 24) / 25) & 15;
                     }
                 }
-                current = (current & 0xFFFFFFFFFF00FFFFL) | (scale - 3 & 15) << 20 | (fontIndex & 15) << 16;
+                long next = (current & 0xFFFFFFFFFF00FFFFL) | (scale - 3 & 15) << 20 | (fontIndex & 15) << 16;
+                if(current != next) historyBuffer.add(current);
+                current = next;
                 i--;
-            } else if (text.charAt(i) == '[') {
+            } else if (enableSquareBrackets && text.charAt(i) == '[') {
 
                 //// SQUARE BRACKET MARKUP
                 c = '[';
                 if (++i < n && (c = text.charAt(i)) != '[' && c != '+') {
                     if (c == ']') {
-                        color = baseColor;
-                        current = color & ~SUPERSCRIPT;
-                        scale = 3;
-                        font = this;
-                        capitalize = false;
-                        capsLock = false;
-                        lowerCase = false;
+                        if(historyBuffer.isEmpty()) {
+                            color = baseColor;
+                            current = color & ~SUPERSCRIPT;
+                            scale = 3;
+                            font = this;
+                            capitalize = false;
+                            capsLock = false;
+                            lowerCase = false;
+                        } else {
+                            current = historyBuffer.pop();
+                            scale = (int)((current & 0x1f00000L) >>> 20);
+                            if (family == null) {
+                                font = this;
+                                fontIndex = 0;
+                            }
+                            else {
+                                fontIndex = (int) ((current & 0xF0000L) >>> 16);
+                                font = family.connected[fontIndex & 15];
+                                if (font == null) font = this;
+                            }
+                        }
                         continue;
                     }
+                    historyBuffer.add(current);
                     int len = text.indexOf(']', i) - i;
                     if (len < 0) break;
                     switch (c) {
@@ -3909,7 +4932,9 @@ public class Font implements Disposable {
                                         }
                                     }
                                     // unrecognized falls back to small caps or jostle
-                                    current = ((current & 0xFFFFFFFFFE0FFFFFL) | modes);
+                                    // small caps can be enabled or disabled separately from the other modes, except
+                                    // for jostle, which requires no other modes to be used
+                                    current = ((current & (0xFFFFFFFFFE0FFFFFL ^ (current & 0x1000000L) >>> 4)) ^ modes);
                                     scale = 3;
                                 } else {
                                     current = (current & 0xFFFFFFFFFE0FFFFFL) |
@@ -3948,6 +4973,15 @@ public class Font implements Disposable {
                             else color = (long) lookupColor << 32;
                             current = (current & ~COLOR_MASK) | color;
                             break;
+                        case ' ':
+                            color = baseColor;
+                            current = color & ~SUPERSCRIPT;
+                            scale = 3;
+                            font = this;
+                            capitalize = false;
+                            capsLock = false;
+                            lowerCase = false;
+                            break;
                         default:
                             // attempt to look up a known Color name with a ColorLookup
                             int gdxColor = colorLookup.getRgba(safeSubstring(text, i, i + len)) & 0xFFFFFFFE;
@@ -3962,32 +4996,34 @@ public class Font implements Disposable {
 
                 else {
                     float w;
-                    if(c == '+' && nameLookup != null) {
+                    if(c == '+' && font.nameLookup != null) {
                         int len = text.indexOf(']', i) - i;
                         if (len >= 0) {
-                            c = nameLookup.get(safeSubstring(text, i + 1, i + len), '+');
+                            c = font.nameLookup.get(safeSubstring(text, i + 1, i + len), '+');
                             i += len;
-                            scaleX = (scale + 1) * 0.25f * cellHeight / (font.mapping.get(c, font.defaultValue).xAdvance*1.25f);
+                            scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(c, font.defaultValue).xAdvance);
                         }
                     }
                     if (font.kerning == null) {
                         w = (appendTo.peekLine().width += xAdvance(font, scaleX, current | c));
-                        if(initial){
-                            float ox = font.mapping.get(c, font.defaultValue).offsetX
-                                    * scaleX;
+                        if(initial && !isMono){
+                            float ox = font.mapping.get(c, font.defaultValue).offsetX;
+                            if(ox != ox) ox = 0;
+                            else ox *= scaleX;
                             if(ox < 0) w = (appendTo.peekLine().width -= ox);
-                            initial = false;
                         }
-
+                        initial = false;
                     } else {
                         kern = kern << 16 | c;
                         w = (appendTo.peekLine().width += xAdvance(font, scaleX, current | c) + font.kerning.get(kern, 0) * scaleX * (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63)));
-                        if(initial){
-                            float ox = font.mapping.get(c, font.defaultValue).offsetX
-                                    * scaleX * (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
-                            if(ox < 0) w = (appendTo.peekLine().width -= ox);
-                            initial = false;
+                        if(initial && !isMono){
+                            float ox = font.mapping.get(c, font.defaultValue).offsetX;
+                            if(ox != ox) ox = 0;
+                            else ox *= scaleX;
+                            ox *= (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
+                            if (ox < 0) w = (appendTo.peekLine().width -= ox);
                         }
+                        initial = false;
                     }
                     if(c == '[')
                         appendTo.add(current | 2);
@@ -4020,18 +5056,20 @@ public class Font implements Disposable {
                                         boolean curly = false;
                                         for (int k = j + 1; k < earlier.glyphs.size; k++) {
                                             curr = earlier.glyphs.get(k);
-                                            if (curly) {
-                                                glyphBuffer.add(curr);
-                                                if ((char) curr == '{') {
-                                                    curly = false;
-                                                } else if ((char) curr == '}') {
-                                                    curly = false;
-                                                    continue;
-                                                } else continue;
+                                            if(omitCurlyBraces) {
+                                                if (curly) {
+                                                    glyphBuffer.add(curr);
+                                                    if ((char) curr == '{') {
+                                                        curly = false;
+                                                    } else if ((char) curr == '}') {
+                                                        curly = false;
+                                                        continue;
+                                                    } else continue;
+                                                }
                                             }
                                             if ((char) curr == '{') {
                                                 glyphBuffer.add(curr);
-                                                curly = true;
+                                                curly = omitCurlyBraces;
                                                 continue;
                                             }
 
@@ -4041,9 +5079,13 @@ public class Font implements Disposable {
                                                 glyphBuffer.add(curr);
                                                 changeNext += adv;
                                                 if(glyphBuffer.size == 1){
-                                                    float ox = font.mapping.get((char)curr, font.defaultValue).offsetX
-                                                            * scaleX * (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
-                                                    if(ox < 0) changeNext -= ox;
+                                                    if(!isMono) {
+                                                        float ox = font.mapping.get((char) curr, font.defaultValue).offsetX;
+                                                        if (ox != ox) ox = 0;
+                                                        else ox *= scaleX;
+                                                        ox *= (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
+                                                        if (ox < 0) changeNext -= ox;
+                                                    }
                                                     initial = false;
                                                 }
 
@@ -4057,18 +5099,20 @@ public class Font implements Disposable {
                                         boolean curly = false;
                                         for (int k = j + 1; k < earlier.glyphs.size; k++) {
                                             curr = earlier.glyphs.get(k);
-                                            if (curly) {
-                                                glyphBuffer.add(curr);
-                                                if ((char) curr == '{') {
-                                                    curly = false;
-                                                } else if ((char) curr == '}') {
-                                                    curly = false;
-                                                    continue;
-                                                } else continue;
+                                            if(omitCurlyBraces) {
+                                                if (curly) {
+                                                    glyphBuffer.add(curr);
+                                                    if ((char) curr == '{') {
+                                                        curly = false;
+                                                    } else if ((char) curr == '}') {
+                                                        curly = false;
+                                                        continue;
+                                                    } else continue;
+                                                }
                                             }
                                             if ((char) curr == '{') {
                                                 glyphBuffer.add(curr);
-                                                curly = true;
+                                                curly = omitCurlyBraces;
                                                 continue;
                                             }
                                             k2 = k2 << 16 | (char) curr;
@@ -4079,9 +5123,13 @@ public class Font implements Disposable {
                                                 changeNext += adv + font.kerning.get(k3, 0) * scaleX * (1f + 0.5f * (-(curr & SUPERSCRIPT) >> 63));
                                                 glyphBuffer.add(curr);
                                                 if(glyphBuffer.size == 1){
-                                                    float ox = font.mapping.get((char)curr, font.defaultValue).offsetX
-                                                            * scaleX * (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
-                                                    if(ox < 0) changeNext -= ox;
+                                                    if(!isMono) {
+                                                        float ox = font.mapping.get((char) curr, font.defaultValue).offsetX;
+                                                        if (ox != ox) ox = 0;
+                                                        else ox *= scaleX;
+                                                        ox *= (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
+                                                        if (ox < 0) changeNext -= ox;
+                                                    }
                                                     initial = false;
                                                 }
                                             }
@@ -4090,17 +5138,21 @@ public class Font implements Disposable {
                                     if (earlier.width - change > targetWidth)
                                         continue;
                                     earlier.glyphs.truncate(j + 1);
-                                    earlier.glyphs.add('\n');
+                                    earlier.glyphs.add(' ');
+//                                    earlier.glyphs.add('\n');
                                     later.width = changeNext;
                                     earlier.width -= change;
                                     later.glyphs.addAll(glyphBuffer);
-                                    later.height = Math.max(later.height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                                    later.height = Math.max(later.height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
                                     break;
                                 }
                             }
+                            if(later.glyphs.isEmpty()){
+                                appendTo.lines.pop();
+                            }
                         }
                     } else {
-                        appendTo.peekLine().height = Math.max(appendTo.peekLine().height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                        appendTo.peekLine().height = Math.max(appendTo.peekLine().height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
                     }
                 }
             } else {
@@ -4123,7 +5175,8 @@ public class Font implements Disposable {
                 }
                 showCh = (current & SMALL_CAPS) == SMALL_CAPS ? Category.caseUp(ch) : ch;
                 if(ch >= 0xE000 && ch < 0xF800){
-                    scaleX = (scale + 1) * 0.25f * cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance*1.25f);
+                    scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance);
+//                    scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance*1.25f);
                 }
                 float w;
                 if (font.kerning == null) {
@@ -4132,13 +5185,14 @@ public class Font implements Disposable {
                     kern = kern << 16 | showCh;
                     w = (appendTo.peekLine().width += xAdvance(font, scaleX, current | showCh) + font.kerning.get(kern, 0) * scaleX * (1f + 0.5f * (-((current | showCh) & SUPERSCRIPT) >> 63)));
                 }
-                if(initial){
-                    float ox = font.mapping.get(showCh, font.defaultValue).offsetX
-                            * scaleX;
-                    if(!isMono) ox *= (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
-                    if(ox < 0) w = (appendTo.peekLine().width -= ox);
-                    initial = false;
+                if(initial && !isMono) {
+                    float ox = font.mapping.get(showCh, font.defaultValue).offsetX;
+                    if (ox != ox) ox = 0;
+                    else ox *= scaleX;
+                    ox *= (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
+                    if (ox < 0) w = (appendTo.peekLine().width -= ox);
                 }
+                initial = false;
                 if (ch == '\n')
                 {
                     appendTo.peekLine().height = Math.max(appendTo.peekLine().height, font.cellHeight * (scale + 1) * 0.25f);
@@ -4151,7 +5205,7 @@ public class Font implements Disposable {
                     if (appendTo.lines.size >= appendTo.maxLines) {
                         later = null;
                     } else {
-                        later = Line.POOL.obtain();
+                        later = new Line();
                         later.height = 0;
                         appendTo.lines.add(later);
                         initial = true;
@@ -4159,90 +5213,6 @@ public class Font implements Disposable {
                     if (later == null) {
                         if(handleEllipsis(appendTo))
                             return appendTo;
-//                        //// ELLIPSIS FOR VISIBLE
-//
-//                        // here, the max lines have been reached, and an ellipsis may need to be added
-//                        // to the last line.
-//                        String ellipsis = (appendTo.ellipsis == null) ? "" : appendTo.ellipsis;
-//                        for (int j = earlier.glyphs.size - 2; j >= 0; j--) {
-//                            long curr;
-//                            if ((curr = earlier.glyphs.get(j)) >>> 32 == 0L ||
-//                                    Arrays.binarySearch(breakChars.items, 0, breakChars.size, (char) curr) >= 0) {
-//                                while (j > 0 && ((curr = earlier.glyphs.get(j)) >>> 32 == 0L ||
-//                                        Arrays.binarySearch(spaceChars.items, 0, spaceChars.size, (char) curr) >= 0)) {
-//                                    --j;
-//                                }
-//                                float change = 0f;
-//                                if (font.kerning == null) {
-//
-//                                    // NO KERNING
-//
-//                                    boolean curly = false;
-//                                    for (int k = j + 1; k < earlier.glyphs.size; k++) {
-//                                        curr = earlier.glyphs.get(k);
-//                                        if (curly) {
-//                                            if ((char) curr == '{') {
-//                                                curly = false;
-//                                            } else if ((char) curr == '}') {
-//                                                curly = false;
-//                                                continue;
-//                                            } else continue;
-//                                        }
-//                                        if ((char) curr == '{') {
-//                                            curly = true;
-//                                            continue;
-//                                        }
-//
-//                                        float adv = xAdvance(font, scaleX, curr);
-//                                        change += adv;
-//                                    }
-//                                    for (int e = 0; e < ellipsis.length(); e++) {
-//                                        curr = current | ellipsis.charAt(e);
-//                                        float adv = xAdvance(font, scaleX, curr);
-//                                        change -= adv;
-//                                    }
-//                                } else {
-//
-//                                    // YES KERNING
-//
-//                                    int k2 = (char) earlier.glyphs.get(j);
-//                                    kern = -1;
-//                                    boolean curly = false;
-//                                    for (int k = j + 1; k < earlier.glyphs.size; k++) {
-//                                        curr = earlier.glyphs.get(k);
-//                                        if (curly) {
-//                                            if ((char) curr == '{') {
-//                                                curly = false;
-//                                            } else if ((char) curr == '}') {
-//                                                curly = false;
-//                                                continue;
-//                                            } else continue;
-//                                        }
-//                                        if ((char) curr == '{') {
-//                                            curly = true;
-//                                            continue;
-//                                        }
-//                                        k2 = k2 << 16 | (char) curr;
-//                                        float adv = xAdvance(font, scaleX, curr);
-//                                        change += adv + font.kerning.get(k2, 0) * scaleX * (isMono || (curr & SUPERSCRIPT) == 0L ? 1f : 0.5f);
-//                                    }
-//                                    for (int e = 0; e < ellipsis.length(); e++) {
-//                                        curr = current | ellipsis.charAt(e);
-//                                        k2 = k2 << 16 | (char) curr;
-//                                        float adv = xAdvance(font, scaleX, curr);
-//                                        change -= adv + font.kerning.get(k2, 0) * scaleX * (isMono || (curr & SUPERSCRIPT) == 0L ? 1f : 0.5f);
-//                                    }
-//                                }
-//                                if (earlier.width - change > targetWidth)
-//                                    continue;
-//                                earlier.glyphs.truncate(j + 1);
-//                                for (int e = 0; e < ellipsis.length(); e++) {
-//                                    earlier.glyphs.add(current | ellipsis.charAt(e));
-//                                }
-//                                earlier.width -= change;
-//                                return appendTo;
-//                            }
-//                        }
                     } else {
 
                         //// WRAP VISIBLE
@@ -4267,18 +5237,20 @@ public class Font implements Disposable {
                                     for (int k = j + 1; k < earlier.glyphs.size; k++) {
                                         curr = earlier.glyphs.get(k);
                                         showCh = (curr & SMALL_CAPS) == SMALL_CAPS ? Category.caseUp((char)curr) : (char)curr;
-                                        if (curly) {
-                                            glyphBuffer.add(curr);
-                                            if ((char) curr == '{') {
-                                                curly = false;
-                                            } else if ((char) curr == '}') {
-                                                curly = false;
-                                                continue;
-                                            } else continue;
+                                        if(omitCurlyBraces) {
+                                            if (curly) {
+                                                glyphBuffer.add(curr);
+                                                if ((char) curr == '{') {
+                                                    curly = false;
+                                                } else if ((char) curr == '}') {
+                                                    curly = false;
+                                                    continue;
+                                                } else continue;
+                                            }
                                         }
                                         if (showCh == '{') {
                                             glyphBuffer.add(curr);
-                                            curly = true;
+                                            curly = omitCurlyBraces;
                                             continue;
                                         }
 
@@ -4288,9 +5260,12 @@ public class Font implements Disposable {
                                             glyphBuffer.add(curr);
                                             changeNext += adv;
                                             if(glyphBuffer.size == 1){
-                                                float ox = font.mapping.get(showCh, font.defaultValue).offsetX
-                                                        * scaleX * (isMono || (curr & SUPERSCRIPT) == 0L ? 1f : 0.5f);
-                                                if(ox < 0) changeNext -= ox;
+                                                if(!isMono) {
+                                                    float ox = font.mapping.get(showCh, font.defaultValue).offsetX;
+                                                    if (ox != ox) ox = 0;
+                                                    else ox *= scaleX * (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
+                                                    if (ox < 0) changeNext -= ox;
+                                                }
                                                 initial = false;
                                             }
 
@@ -4306,18 +5281,20 @@ public class Font implements Disposable {
                                     for (int k = j + 1; k < earlier.glyphs.size; k++) {
                                         curr = earlier.glyphs.get(k);
                                         showCh = (curr & SMALL_CAPS) == SMALL_CAPS ? Category.caseUp((char)curr) : (char)curr;
-                                        if (curly) {
-                                            glyphBuffer.add(curr);
-                                            if ((char) curr == '{') {
-                                                curly = false;
-                                            } else if ((char) curr == '}') {
-                                                curly = false;
-                                                continue;
-                                            } else continue;
+                                        if(omitCurlyBraces){
+                                            if (curly) {
+                                                glyphBuffer.add(curr);
+                                                if ((char) curr == '{') {
+                                                    curly = false;
+                                                } else if ((char) curr == '}') {
+                                                    curly = false;
+                                                    continue;
+                                                } else continue;
+                                            }
                                         }
                                         if (showCh == '{') {
                                             glyphBuffer.add(curr);
-                                            curly = true;
+                                            curly = omitCurlyBraces;
                                             continue;
                                         }
                                         k2 = k2 << 16 | showCh;
@@ -4328,9 +5305,12 @@ public class Font implements Disposable {
                                             changeNext += adv + font.kerning.get(kern, 0) * scaleX * (isMono || (curr & SUPERSCRIPT) == 0L ? 1f : 0.5f);
                                             glyphBuffer.add(curr);
                                             if(glyphBuffer.size == 1){
-                                                float ox = font.mapping.get(showCh, font.defaultValue).offsetX
-                                                        * scaleX * (isMono || (curr & SUPERSCRIPT) == 0L ? 1f : 0.5f);
-                                                if(ox < 0) changeNext -= ox;
+                                                if(!isMono) {
+                                                    float ox = font.mapping.get(showCh, font.defaultValue).offsetX;
+                                                    if (ox != ox) ox = 0;
+                                                    else ox *= scaleX * (1f + 0.5f * (-(current & SUPERSCRIPT) >> 63));
+                                                    if (ox < 0) changeNext -= ox;
+                                                }
                                                 initial = false;
                                             }
                                         }
@@ -4339,17 +5319,21 @@ public class Font implements Disposable {
                                 if (earlier.width - change > targetWidth)
                                     continue;
                                 earlier.glyphs.truncate(j + 1);
-                                earlier.glyphs.add('\n');
+                                earlier.glyphs.add(' ');
+//                                earlier.glyphs.add('\n');
                                 later.width = changeNext;
                                 earlier.width -= change;
                                 later.glyphs.addAll(glyphBuffer);
-                                later.height = Math.max(later.height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                                later.height = Math.max(later.height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
                                 break;
                             }
                         }
+                        if(later.glyphs.isEmpty()){
+                            appendTo.lines.pop();
+                        }
                     }
                 } else {
-                    appendTo.peekLine().height = Math.max(appendTo.peekLine().height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                    appendTo.peekLine().height = Math.max(appendTo.peekLine().height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
                 }
             }
         }
@@ -4386,16 +5370,18 @@ public class Font implements Disposable {
                         if (family != null) font = family.connected[(int) (curr >>> 16 & 15)];
                         if (font == null) font = this;
 
-                        if (curly) {
-                            if ((char) curr == '{') {
-                                curly = false;
-                            } else if ((char) curr == '}') {
-                                curly = false;
-                                continue;
-                            } else continue;
+                        if(omitCurlyBraces){
+                            if (curly) {
+                                if ((char) curr == '{') {
+                                    curly = false;
+                                } else if ((char) curr == '}') {
+                                    curly = false;
+                                    continue;
+                                } else continue;
+                            }
                         }
                         if ((char) curr == '{') {
-                            curly = true;
+                            curly = omitCurlyBraces;
                             continue;
                         }
 
@@ -4403,7 +5389,8 @@ public class Font implements Disposable {
                         change += adv;
                     }
                     for (int e = 0; e < ellipsis.length(); e++) {
-                        curr = (curr & 0xFFFFFFFFFFFF0000L) | ellipsis.charAt(e);
+                        // 0xFFFFFFFF81FF0000L masks to include everything but style and char
+                        curr = (curr & 0xFFFFFFFF81FF0000L) | ellipsis.charAt(e);
                         float adv = xAdvance(font, scaleX, curr);
                         change -= adv;
                     }
@@ -4412,22 +5399,23 @@ public class Font implements Disposable {
                     // YES KERNING
 
                     int k2 = (char) earlier.glyphs.get(j);
-                    int kern = -1;
                     boolean curly = false;
                     for (int k = j + 1; k < earlier.glyphs.size; k++) {
                         curr = earlier.glyphs.get(k);
                         if (family != null) font = family.connected[(int) (curr >>> 16 & 15)];
                         if (font == null) font = this;
-                        if (curly) {
-                            if ((char) curr == '{') {
-                                curly = false;
-                            } else if ((char) curr == '}') {
-                                curly = false;
-                                continue;
-                            } else continue;
+                        if(omitCurlyBraces) {
+                            if (curly) {
+                                if ((char) curr == '{') {
+                                    curly = false;
+                                } else if ((char) curr == '}') {
+                                    curly = false;
+                                    continue;
+                                } else continue;
+                            }
                         }
                         if ((char) curr == '{') {
-                            curly = true;
+                            curly = omitCurlyBraces;
                             continue;
                         }
                         k2 = k2 << 16 | (char) curr;
@@ -4435,7 +5423,8 @@ public class Font implements Disposable {
                         change += adv + font.kerning.get(k2, 0) * scaleX * (isMono || (curr & SUPERSCRIPT) == 0L ? 1f : 0.5f);
                     }
                     for (int e = 0; e < ellipsis.length(); e++) {
-                        curr = (curr & 0xFFFFFFFFFFFF0000L) | ellipsis.charAt(e);
+                        // 0xFFFFFFFF81FF0000L masks to include everything but style and char
+                        curr = (curr & 0xFFFFFFFF81FF0000L) | ellipsis.charAt(e);
                         k2 = k2 << 16 | (char) curr;
                         float adv = xAdvance(font, scaleX, curr);
                         change -= adv + font.kerning.get(k2, 0) * scaleX * (isMono || (curr & SUPERSCRIPT) == 0L ? 1f : 0.5f);
@@ -4445,7 +5434,8 @@ public class Font implements Disposable {
                     continue;
                 earlier.glyphs.truncate(j + 1);
                 for (int e = 0; e < ellipsis.length(); e++) {
-                    earlier.glyphs.add((curr & 0xFFFFFFFFFFFF0000L) | ellipsis.charAt(e));
+                    // 0xFFFFFFFF81FF0000L masks to include everything but style and char
+                    earlier.glyphs.add((curr & 0xFFFFFFFF81FF0000L) | ellipsis.charAt(e));
                 }
                 earlier.width -= change;
                 return true;
@@ -4475,8 +5465,15 @@ public class Font implements Disposable {
      *     <li>{@code [,]} toggles all lower case mode.</li>
      *     <li>{@code [;]} toggles capitalize each word mode (this is the same as upper case mode here).</li>
      *     <li>{@code [%P]}, where P is a percentage from 0 to 375, changes the scale to that percentage (rounded to
-     *     the nearest 25% mark).</li>
-     *     <li>{@code [%]}, with no number just after it, resets scale to 100% (this usually has no effect here).</li>
+     *     the nearest 25% mark). This also disables any alternate mode.</li>
+     *     <li>{@code [%?MODE]}, where MODE can be (case-insensitive) one of "black outline", "white outline", "shiny",
+     *     "drop shadow"/"shadow", "error", "warn", "note", or "jostle", will disable scaling and enable that alternate
+     *     mode. If MODE is empty or not recognized, this considers it equivalent to "jostle".</li>
+     *     <li>{@code [%^MODE]}, where MODE can be (case-insensitive) one of "black outline", "white outline", "shiny",
+     *     "drop shadow"/"shadow", "error", "warn", "note", or "small caps", will disable scaling and enable that
+     *     alternate mode along with small caps mode at the same time. If MODE is empty or not recognized, this
+     *     considers it equivalent to "small caps" (without another mode).</li>
+     *     <li>{@code [%]}, with no number just after it, resets scale to 100% and disables any alternate mode.</li>
      *     <li>{@code [@Name]}, where Name is a key in family, changes the current Font used for rendering to the Font
      *     in this.family by that name. This is ignored if family is null.</li>
      *     <li>{@code [@]}, with no text just after it, resets the font to this one (which should be item 0 in family,
@@ -4526,8 +5523,15 @@ public class Font implements Disposable {
      *     <li>{@code [,]} toggles all lower case mode.</li>
      *     <li>{@code [;]} toggles capitalize each word mode (this is the same as upper case mode here).</li>
      *     <li>{@code [%P]}, where P is a percentage from 0 to 375, changes the scale to that percentage (rounded to
-     *     the nearest 25% mark).</li>
-     *     <li>{@code [%]}, with no number just after it, resets scale to 100% (this usually has no effect here).</li>
+     *     the nearest 25% mark). This also disables any alternate mode.</li>
+     *     <li>{@code [%?MODE]}, where MODE can be (case-insensitive) one of "black outline", "white outline", "shiny",
+     *     "drop shadow"/"shadow", "error", "warn", "note", or "jostle", will disable scaling and enable that alternate
+     *     mode. If MODE is empty or not recognized, this considers it equivalent to "jostle".</li>
+     *     <li>{@code [%^MODE]}, where MODE can be (case-insensitive) one of "black outline", "white outline", "shiny",
+     *     "drop shadow"/"shadow", "error", "warn", "note", or "small caps", will disable scaling and enable that
+     *     alternate mode along with small caps mode at the same time. If MODE is empty or not recognized, this
+     *     considers it equivalent to "small caps" (without another mode).</li>
+     *     <li>{@code [%]}, with no number just after it, resets scale to 100% and disables any alternate mode.</li>
      *     <li>{@code [@Name]}, where Name is a key in family, changes the current Font used for rendering to the Font
      *     in this.family by that name. This is ignored if family is null.</li>
      *     <li>{@code [@]}, with no text just after the @, resets the font to this one (which should be item 0 in
@@ -4554,17 +5558,33 @@ public class Font implements Disposable {
         long baseColor = 0xFFFFFFFE00000000L;
         long color = baseColor;
         long current = color;
+        Font font = this;
         for (int i = 0, n = markup.length(); i <= n; i++) {
             if(i == n) return current | ' ';
             //// CURLY BRACKETS
-            if (markup.charAt(i) == '{' && i + 1 < n && markup.charAt(i + 1) != '{') {
+            if (omitCurlyBraces && markup.charAt(i) == '{' && i + 1 < n && markup.charAt(i + 1) != '{') {
                 int start = i;
-                int sizeChange = -1, fontChange = -1;
+                int sizeChange = -1, fontChange = -1, innerSquareStart = -1, innerSquareEnd = -1;
                 int end = markup.indexOf('}', i);
                 if (end == -1) end = markup.length();
                 int eq = end;
                 for (; i < n && i <= end; i++) {
                     c = markup.charAt(i);
+
+                    if (enableSquareBrackets && c == '[' && i < end && markup.charAt(i+1) == '+') innerSquareStart = i;
+                    else if(innerSquareStart == -1) current = (current | c);
+                    if (enableSquareBrackets && c == ']') {
+                        innerSquareEnd = i;
+                        if(innerSquareStart != -1 && font.nameLookup != null) {
+                            int len = innerSquareEnd - innerSquareStart;
+                            if (len >= 2) {
+                                c = font.nameLookup.get(safeSubstring(markup, innerSquareStart + 2, innerSquareEnd), '+');
+                                innerSquareStart = -1;
+                                current = (current | c);
+                            }
+                        }
+                    }
+
                     if (c == '@') fontChange = i;
                     else if (c == '%') sizeChange = i;
                     else if (c == '?') sizeChange = -1;
@@ -4604,6 +5624,8 @@ public class Font implements Disposable {
                     } else {
                         if (family.connected[fontIndex] == null) {
                             fontIndex = 0;
+                        } else {
+                            font = family.connected[fontIndex];
                         }
                     }
                 } else if (sizeChange >= 0) {
@@ -4619,7 +5641,7 @@ public class Font implements Disposable {
                 }
                 current = (current & 0xFFFFFFFFFF00FFFFL) | (scale - 3 & 15) << 20 | (fontIndex & 15) << 16;
                 i--;
-            } else if (markup.charAt(i) == '[') {
+            } else if (enableSquareBrackets && markup.charAt(i) == '[') {
 
                 //// SQUARE BRACKET MARKUP
                 c = '[';
@@ -4683,15 +5705,47 @@ public class Font implements Disposable {
                             break;
                         case '%':
                             if (len >= 2) {
-                                // alternate mode, currently just takes a number for what mode to use
-                                if (markup.charAt(i + 1) == '?') {
-                                    if(len >= 3)
-                                        current = ((current & 0xFFFFFFFFFE0FFFFFL) | ALTERNATE) ^ (intFromDec(markup, i+2, i + len) & 15);
-                                    else
-                                        current = (current & 0xFFFFFFFFFE0FFFFFL); // clear alternate modes and scaling
+                                // alternate mode, takes [%?] to enable JOSTLE mode, [%^] to enable just SMALL_CAPS, or
+                                // a question mark followed by the name of the mode, like [%?Black Outline], to enable
+                                // BLACK_OUTLINE mode, OR a caret followed by the name of a mode, like [%^shadow], to
+                                // enable SMALL_CAPS and DROP_SHADOW modes.
+                                if (markup.charAt(i + 1) == '?' || markup.charAt(i + 1) == '^') {
+                                    long modes = (markup.charAt(i + 1) == '^' ? SMALL_CAPS : ALTERNATE);
+                                    if(len >= 5) {
+                                        char ch = Category.caseUp(markup.charAt(i+2));
+                                        if(ch == 'B') {
+                                            modes |= BLACK_OUTLINE;
+                                        } else if(ch == 'W') {
+                                            if(Category.caseUp(markup.charAt(i+3)) == 'H') {
+                                                modes |= WHITE_OUTLINE;
+                                            }
+                                            else {
+                                                modes |= WARN;
+                                            }
+                                        } else if(ch == 'S') {
+                                            if(Category.caseUp(markup.charAt(i+4)) == 'I') {
+                                                modes |= SHINY;
+                                            }
+                                            else if(Category.caseUp(markup.charAt(i+3)) == 'H'){
+                                                modes |= DROP_SHADOW;
+                                            }
+                                            // unrecognized falls back to small caps or jostle
+                                        } else if(ch == 'D'){
+                                            modes |= DROP_SHADOW;
+                                        } else if(ch == 'E'){
+                                            modes |= ERROR;
+                                        } else if(ch == 'N'){
+                                            modes |= NOTE;
+                                        }
+                                    }
+                                    // unrecognized falls back to small caps or jostle
+                                    // small caps can be enabled or disabled separately from the other modes, except
+                                    // for jostle, which requires no other modes to be used
+                                    current = ((current & (0xFFFFFFFFFE0FFFFFL ^ (current & 0x1000000L) >>> 4)) ^ modes);
                                     scale = 3;
                                 } else {
-                                    current = (current & 0xFFFFFFFFFE0FFFFFL) | ((scale = ((intFromDec(markup, i + 1, i + len) - 24) / 25) & 15) - 3 & 15) << 20;
+                                    current = (current & 0xFFFFFFFFFE0FFFFFL) |
+                                            ((scale = ((intFromDec(markup, i + 1, i + len) - 24) / 25) & 15) - 3 & 15) << 20;
                                 }
                             }
                             else {
@@ -4714,6 +5768,7 @@ public class Font implements Disposable {
                                 break;
                             }
                             fontIndex = family.fontAliases.get(safeSubstring(markup, i + 1, i + len), 0);
+                            font = family.connected[fontIndex];
                             current = (current & 0xFFFFFFFFFFF0FFFFL) | (fontIndex & 15L) << 16;
                             break;
                         case '|':
@@ -4737,10 +5792,10 @@ public class Font implements Disposable {
 
                 else {
                     float w;
-                    if(c == '+' && nameLookup != null) {
+                    if(c == '+' && font.nameLookup != null) {
                         int len = markup.indexOf(']', i) - i;
                         if (len >= 0) {
-                            c = nameLookup.get(safeSubstring(markup, i + 1, i + len), '+');
+                            c = font.nameLookup.get(safeSubstring(markup, i + 1, i + len), '+');
                         }
                     }
                     if(c == '[')
@@ -4789,8 +5844,15 @@ public class Font implements Disposable {
      *     <li>{@code [,]} toggles all lower case mode.</li>
      *     <li>{@code [;]} toggles capitalize each word mode (this is the same as upper case mode here).</li>
      *     <li>{@code [%P]}, where P is a percentage from 0 to 375, changes the scale to that percentage (rounded to
-     *     the nearest 25% mark).</li>
-     *     <li>{@code [%]}, with no number just after it, resets scale to 100% (this usually has no effect here).</li>
+     *     the nearest 25% mark). This also disables any alternate mode.</li>
+     *     <li>{@code [%?MODE]}, where MODE can be (case-insensitive) one of "black outline", "white outline", "shiny",
+     *     "drop shadow"/"shadow", "error", "warn", "note", or "jostle", will disable scaling and enable that alternate
+     *     mode. If MODE is empty or not recognized, this considers it equivalent to "jostle".</li>
+     *     <li>{@code [%^MODE]}, where MODE can be (case-insensitive) one of "black outline", "white outline", "shiny",
+     *     "drop shadow"/"shadow", "error", "warn", "note", or "small caps", will disable scaling and enable that
+     *     alternate mode along with small caps mode at the same time. If MODE is empty or not recognized, this
+     *     considers it equivalent to "small caps" (without another mode).</li>
+     *     <li>{@code [%]}, with no number just after it, resets scale to 100% and disables any alternate mode.</li>
      *     <li>{@code [@Name]}, where Name is a key in family, changes the current Font used for rendering to the Font
      *     in this.family by that name. This is ignored if family is null.</li>
      *     <li>{@code [@]}, with no text just after it, resets the font to this one (which should be item 0 in family,
@@ -4805,7 +5867,7 @@ public class Font implements Disposable {
      * usually be stored for later without needing repeated computation.
      * <br>
      * This takes a ColorLookup so that it can look up colors given a name or description; if you don't know what to
-     * use, then {@link ColorLookup#INSTANCE} is often perfectly fine. Because this is static, it does
+     * use, then {@link ColorLookup#DESCRIPTIVE} is the default elsewhere. Because this is static, it does
      * not need a Font to be involved.
      *
      * @param chr         a single char to apply markup to
@@ -4839,8 +5901,15 @@ public class Font implements Disposable {
      *     <li>{@code [,]} toggles all lower case mode.</li>
      *     <li>{@code [;]} toggles capitalize each word mode (this is the same as upper case mode here).</li>
      *     <li>{@code [%P]}, where P is a percentage from 0 to 375, changes the scale to that percentage (rounded to
-     *     the nearest 25% mark).</li>
-     *     <li>{@code [%]}, with no number just after it, resets scale to 100% (this usually has no effect here).</li>
+     *     the nearest 25% mark). This also disables any alternate mode.</li>
+     *     <li>{@code [%?MODE]}, where MODE can be (case-insensitive) one of "black outline", "white outline", "shiny",
+     *     "drop shadow"/"shadow", "error", "warn", "note", or "jostle", will disable scaling and enable that alternate
+     *     mode. If MODE is empty or not recognized, this considers it equivalent to "jostle".</li>
+     *     <li>{@code [%^MODE]}, where MODE can be (case-insensitive) one of "black outline", "white outline", "shiny",
+     *     "drop shadow"/"shadow", "error", "warn", "note", or "small caps", will disable scaling and enable that
+     *     alternate mode along with small caps mode at the same time. If MODE is empty or not recognized, this
+     *     considers it equivalent to "small caps" (without another mode).</li>
+     *     <li>{@code [%]}, with no number just after it, resets scale to 100% and disables any alternate mode.</li>
      *     <li>{@code [@Name]}, where Name is a key in family, changes the current Font used for rendering to the Font
      *     in this.family by that name. This is ignored if family is null.</li>
      *     <li>{@code [@]}, with no text just after it, resets the font to this one (which should be item 0 in family,
@@ -4855,12 +5924,12 @@ public class Font implements Disposable {
      * usually be stored for later without needing repeated computation.
      * <br>
      * This takes a ColorLookup so that it can look up colors given a name or description; if you don't know what to
-     * use, then {@link ColorLookup#INSTANCE} is often perfectly fine. Because this is static, it does
+     * use, then {@link ColorLookup#DESCRIPTIVE} is the default elsewhere. Because this is static, it does
      * not need a Font to be involved.
      *
      * @param chr         a single char to apply markup to
      * @param markup      a String containing only markup syntax, like "[*][_][RED]" for bold underline in red
-     * @param colorLookup a ColorLookup (often a method reference or {@link ColorLookup#INSTANCE}) to get
+     * @param colorLookup a ColorLookup (often a method reference or {@link ColorLookup#DESCRIPTIVE}) to get
      *                    colors from textual names or descriptions
      * @return a long that encodes the given char with the specified markup
      */
@@ -4925,12 +5994,43 @@ public class Font implements Disposable {
                             break;
                         case '%':
                             if (len >= 2) {
-                                // alternate mode, currently just takes a number for what mode to use
-                                if (markup.charAt(i + 1) == '?') {
-                                    if(len >= 3)
-                                        current = ((current & 0xFFFFFFFFFE0FFFFFL) | ALTERNATE) ^ (intFromDec(markup, i+2, i + len) & 15);
-                                    else
-                                        current = (current & 0xFFFFFFFFFE0FFFFFL); // clear alternate modes and scaling
+                                // alternate mode, takes [%?] to enable JOSTLE mode, [%^] to enable just SMALL_CAPS, or
+                                // a question mark followed by the name of the mode, like [%?Black Outline], to enable
+                                // BLACK_OUTLINE mode, OR a caret followed by the name of a mode, like [%^shadow], to
+                                // enable SMALL_CAPS and DROP_SHADOW modes.
+                                if (markup.charAt(i + 1) == '?' || markup.charAt(i + 1) == '^') {
+                                    long modes = (markup.charAt(i + 1) == '^' ? SMALL_CAPS : ALTERNATE);
+                                    if(len >= 5) {
+                                        char ch = Category.caseUp(markup.charAt(i+2));
+                                        if(ch == 'B') {
+                                            modes |= BLACK_OUTLINE;
+                                        } else if(ch == 'W') {
+                                            if(Category.caseUp(markup.charAt(i+3)) == 'H') {
+                                                modes |= WHITE_OUTLINE;
+                                            }
+                                            else {
+                                                modes |= WARN;
+                                            }
+                                        } else if(ch == 'S') {
+                                            if(Category.caseUp(markup.charAt(i+4)) == 'I') {
+                                                modes |= SHINY;
+                                            }
+                                            else if(Category.caseUp(markup.charAt(i+3)) == 'H'){
+                                                modes |= DROP_SHADOW;
+                                            }
+                                            // unrecognized falls back to small caps or jostle
+                                        } else if(ch == 'D'){
+                                            modes |= DROP_SHADOW;
+                                        } else if(ch == 'E'){
+                                            modes |= ERROR;
+                                        } else if(ch == 'N'){
+                                            modes |= NOTE;
+                                        }
+                                    }
+                                    // unrecognized falls back to small caps or jostle
+                                    // small caps can be enabled or disabled separately from the other modes, except
+                                    // for jostle, which requires no other modes to be used
+                                    current = ((current & (0xFFFFFFFFFE0FFFFFL ^ (current & 0x1000000L) >>> 4)) ^ modes);
                                 } else {
                                     current = (current & 0xFFFFFFFFFE0FFFFFL) | ((((intFromDec(markup, i + 1, i + len) - 24) / 25) & 15) - 3 & 15) << 20;
                                 }
@@ -4975,6 +6075,13 @@ public class Font implements Disposable {
         return current;
     }
 
+    /**
+     * When the {@link Layout#getTargetWidth() targetWidth} of a Layout changes, you can use this to cause the text to
+     * be placed according to the new width, and wrap if needed. This doesn't allocate as much as
+     * {@link #markup(String, Layout)}, if at all, but may eat up newlines if called repeatedly.
+     * @param changing a Layout that will be modified in-place
+     * @return {@code changing}, after modifications
+     */
     public Layout regenerateLayout(Layout changing) {
         if (changing.font == null) {
             return changing;
@@ -4989,7 +6096,6 @@ public class Font implements Disposable {
         Line firstLine = changing.getLine(0);
         for (int i = 1; i < oldLength; i++) {
             firstLine.glyphs.addAll(changing.getLine(i).glyphs);
-            Line.POOL.free(changing.getLine(i));
         }
         changing.lines.truncate(1);
         for (int ln = 0; ln < changing.lines(); ln++) {
@@ -5008,21 +6114,19 @@ public class Font implements Disposable {
                 if (family != null) font = family.connected[(int) (glyph >>> 16 & 15)];
                 if (font == null) font = this;
 
-                if (ch == '\n') {
-                    glyphs.set(i, glyph ^= 7L);
-                }
                 if (font.kerning == null) {
 
                     //// no kerning
 
                     scale = (int) ((glyph & ALTERNATE) != 0L ? 3 : (glyph + 0x300000L >>> 20 & 15));
-                    line.height = Math.max(line.height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                    line.height = Math.max(line.height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
                     if(ch >= 0xE000 && ch < 0xF800)
-                        scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance*1.25f);
+                        scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance);
+//                        scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance*1.25f);
                     else
                         scaleX = font.scaleX * (scale + 1) * 0.25f;
 
-                    if (ch == '\r') {
+                    if (ch == '\n') {
                         Line next;
                         next = changing.pushLine();
                         glyphs.pop();
@@ -5033,19 +6137,22 @@ public class Font implements Disposable {
                             }
                             break;
                         }
-                        next.height = Math.max(next.height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                        next.height = Math.max(next.height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
 
                         long[] arr = next.glyphs.setSize(glyphs.size - i - 1);
                         System.arraycopy(glyphs.items, i + 1, arr, 0, glyphs.size - i - 1);
                         glyphs.truncate(i);
+//                        glyphs.add(' ');
                         glyphs.add('\n');
                         break;
                     }
                     GlyphRegion tr = font.mapping.get(ch);
                     if (tr == null) continue;
                     float changedW = xAdvance(font, scaleX, glyph);
-                    if(i == 0){
-                        float ox = tr.offsetX * scaleX;
+                    if(i == 0 && !isMono){
+                        float ox = tr.offsetX;
+                        if(ox != ox) ox = 0;
+                        else ox *= scaleX * (1f + 0.5f * (-(glyph & SUPERSCRIPT) >> 63));
                         if(ox < 0) changedW -= ox;
                     }
                     if (breakPoint >= 0 && drawn + changedW > targetWidth) {
@@ -5064,7 +6171,7 @@ public class Font implements Disposable {
                             }
                             break;
                         }
-                        next.height = Math.max(next.height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                        next.height = Math.max(next.height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
 
                         int nextSize = next.glyphs.size;
                         long[] arr = next.glyphs.setSize(nextSize + glyphs.size - cutoff);
@@ -5074,7 +6181,6 @@ public class Font implements Disposable {
                         break;
                     }
                     if (glyph >>> 32 == 0L) {
-//                        hasMultipleGaps = breakPoint >= 0;
                         breakPoint = i;
                         if (spacingPoint + 1 < i) {
                             spacingSpan = 0;
@@ -5086,7 +6192,7 @@ public class Font implements Disposable {
                         if (Arrays.binarySearch(spaceChars.items, 0, spaceChars.size, (char) glyph) >= 0) {
                             if (spacingPoint + 1 < i) {
                                 spacingSpan = 0;
-                            } else spacingSpan++;
+                            } else spacingSpan=1;
                             spacingPoint = i;
                         }
                     }
@@ -5096,14 +6202,15 @@ public class Font implements Disposable {
                     //// font has kerning
 
                     scale = (int) ((glyph & ALTERNATE) != 0L ? 3 : (glyph + 0x300000L >>> 20 & 15));
-                    line.height = Math.max(line.height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                    line.height = Math.max(line.height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
                     if(ch >= 0xE000 && ch < 0xF800)
-                        scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance*1.25f);
+                        scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance);
+//                        scaleX = (scale + 1) * 0.25f * font.cellHeight / (font.mapping.get(ch, font.defaultValue).xAdvance*1.25f);
                     else
                         scaleX = font.scaleX * (scale + 1) * 0.25f;
                     kern = kern << 16 | ch;
                     amt = font.kerning.get(kern, 0) * scaleX;
-                    if (ch == '\r') {
+                    if (ch == '\n') {
                         Line next;
                         next = changing.pushLine();
                         glyphs.pop();
@@ -5114,24 +6221,25 @@ public class Font implements Disposable {
                             }
                             break;
                         }
-                        next.height = Math.max(next.height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                        next.height = Math.max(next.height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
 
                         long[] arr = next.glyphs.setSize(glyphs.size - i - 1);
                         System.arraycopy(glyphs.items, i + 1, arr, 0, glyphs.size - i - 1);
                         glyphs.truncate(i);
+//                        glyphs.add(' ');
                         glyphs.add('\n');
                         break;
                     }
                     GlyphRegion tr = font.mapping.get(ch);
                     if (tr == null) continue;
                     float changedW = xAdvance(font, scaleX, glyph);
-                    if(i == 0){
-                        float ox = tr.offsetX * scaleX;
-                        if(ox < 0)
-                            changedW -= ox;
+                    if(i == 0 && !isMono){
+                        float ox = tr.offsetX;
+                        if(ox != ox) ox = 0;
+                        else ox *= scaleX * (1f + 0.5f * (-(glyph & SUPERSCRIPT) >> 63));
+                        if(ox < 0) changedW -= ox;
                     }
                     if (breakPoint >= 0 && drawn + changedW + amt > targetWidth) {
-//                    if (hasMultipleGaps && drawn + changedW + amt > targetWidth) {
                         cutoff = breakPoint - spacingSpan + 1;
                         Line next;
                         if (changing.lines() == ln + 1) {
@@ -5147,7 +6255,7 @@ public class Font implements Disposable {
                             }
                             break;
                         }
-                        next.height = Math.max(next.height, (font.cellHeight - font.descent * font.scaleY) * (scale + 1) * 0.25f);
+                        next.height = Math.max(next.height, (font.cellHeight /* - font.descent * font.scaleY */) * (scale + 1) * 0.25f);
 
                         int nextSize = next.glyphs.size;
                         long[] arr = next.glyphs.setSize(nextSize + glyphs.size - cutoff);
@@ -5157,7 +6265,6 @@ public class Font implements Disposable {
                         break;
                     }
                     if (glyph >>> 32 == 0L) {
-//                        hasMultipleGaps = breakPoint >= 0;
                         breakPoint = i;
                         if (spacingPoint + 1 < i) {
                             spacingSpan = 0;
@@ -5165,7 +6272,6 @@ public class Font implements Disposable {
                         spacingPoint = i;
                     }
                     else if (Arrays.binarySearch(breakChars.items, 0, breakChars.size, (char) glyph) >= 0) {
-//                        hasMultipleGaps = breakPoint >= 0;
                         breakPoint = i;
                         if (Arrays.binarySearch(spaceChars.items, 0, spaceChars.size, (char) glyph) >= 0) {
                             if (spacingPoint + 1 < i) {
@@ -5177,8 +6283,6 @@ public class Font implements Disposable {
                     drawn += changedW + amt;
                 }
             }
-//            calculateSize(line);
-//            line.width = drawn;
         }
         calculateSize(changing);
         return changing;
@@ -5296,6 +6400,45 @@ public class Font implements Disposable {
         return (glyph & 0xFFFFFFFFFE0FFFFFL) | ((long) Math.floor(scale * 4.0 - 4.0) & 15L) << 20;
     }
 
+
+    /**
+     * Given a glyph as a long, this returns the bit flags for the current mode, if alternate mode is enabled. The flags
+     * may include {@link #SMALL_CAPS} separately from any other flags except for {@link #JOSTLE} (SMALL_CAPS and JOSTLE
+     * cannot overlap). To check whether a given mode is present, use one of:
+     * <ul>
+     *     <li>{@code (extractMode(glyph) & ALTERNATE_MODES_MASK) == BLACK_OUTLINE}</li>
+     *     <li>{@code (extractMode(glyph) & ALTERNATE_MODES_MASK) == WHITE_OUTLINE}</li>
+     *     <li>{@code (extractMode(glyph) & ALTERNATE_MODES_MASK) == DROP_SHADOW}</li>
+     *     <li>{@code (extractMode(glyph) & ALTERNATE_MODES_MASK) == SHINY}</li>
+     *     <li>{@code (extractMode(glyph) & ALTERNATE_MODES_MASK) == ERROR}</li>
+     *     <li>{@code (extractMode(glyph) & ALTERNATE_MODES_MASK) == WARN}</li>
+     *     <li>{@code (extractMode(glyph) & ALTERNATE_MODES_MASK) == NOTE}</li>
+     *     <li>{@code (extractMode(glyph) & SMALL_CAPS) == SMALL_CAPS}</li>
+     *     <li>{@code (extractMode(glyph) & (ALTERNATE_MODES_MASK | SMALL_CAPS)) == JOSTLE}</li>
+     * </ul>
+     * The last constant of each line is the mode that line checks for. Each constant is defined in Font.
+     * If alternate mode is not enabled, this always returns 0.
+     *
+     * @param glyph a glyph as a long, as used by {@link Layout} and {@link Line}
+     * @return the bit flags for the current alternate mode, if enabled; see docs
+     */
+    public static long extractMode(long glyph) {
+        return (glyph & ALTERNATE) == 0L ? 0L : (glyph & (ALTERNATE_MODES_MASK | SMALL_CAPS));
+    }
+
+    /**
+     * Replaces the section of glyph that stores its alternate mode (which is the same section that stores its scale)
+     * with the given bit flags representing a mode (or lack of one). These bit flags are generally obtained using
+     * {@link #extractMode(long)}, though you could acquire or create them in any number of ways.
+     *
+     * @param glyph a glyph as a long, as used by {@link Layout} and {@link Line}
+     * @param modeFlags bit flags typically obtained from {@link #extractMode(long)}
+     * @return another long glyph that uses the specified mode
+     */
+    public static long applyMode(long glyph, long modeFlags) {
+        return (glyph & 0xFFFFFFFFFE0FFFFFL) | (0x1F00000L & modeFlags);
+    }
+
     /**
      * Given a glyph as a long, this returns the char it displays. This automatically corrects the placeholder char
      * u0002 to the glyph it displays as, {@code '['}.
@@ -5309,7 +6452,9 @@ public class Font implements Disposable {
     }
 
     /**
-     * Replaces the section of glyph that stores its char with the given other char.
+     * Replaces the section of glyph that stores its char with the given other char. You can enter the character
+     * {@code '['} by using the char {@code (char)2}, or possibly by using an actual {@code '['} char. This last option
+     * is untested and unrecommended, but may have uses if you are willing to dig deep into the internals here.
      *
      * @param glyph a glyph as a long, as used by {@link Layout} and {@link Line}
      * @param c     the char to use
@@ -5324,7 +6469,6 @@ public class Font implements Disposable {
      */
     @Override
     public void dispose() {
-        Layout.POOL.free(tempLayout);
         if (shader != null)
             shader.dispose();
         if(whiteBlock != null)
@@ -5332,20 +6476,112 @@ public class Font implements Disposable {
     }
 
     /**
-     * Frees all {@link Line} and {@link Layout} objects stored in static pools, and also clears
-     * {@link TypingConfig#GLOBAL_VARS}. This can be useful if you target Android and you use
-     * Activity.finish(), or some other way of ending an app that does not clear static values.
-     * Consider calling this if you encounter different (buggy) behavior on the second launch
-     * of an Android app vs. the first launch. It is not needed on desktop JVMs or GWT.
+     * Clears {@link TypingConfig#GLOBAL_VARS} and calls {@link TypingConfig#initializeGlobalVars()}. This can be useful
+     * if you target Android and you use Activity.finish(), or some other way of ending an app that does not clear
+     * static values. Consider calling this if you encounter different (buggy) behavior on the second launch of an
+     * Android app vs. the first launch. It is not needed on desktop JVMs or GWT. This only could be needed if you add
+     * different items to {@link TypingConfig#GLOBAL_VARS} on different runs of your Android app.
      */
     public static void clearStatic() {
-        Line.POOL.clear();
-        Layout.POOL.clear();
         TypingConfig.GLOBAL_VARS.clear();
+        TypingConfig.initializeGlobalVars();
     }
+
 
     @Override
     public String toString() {
         return "Font '" + name + "' at scale " + scaleX + " by " + scaleY;
+    }
+
+    public String debugString() {
+        return "Font{" +
+                "distanceField=" + distanceField +
+                ", isMono=" + isMono +
+                ", kerning=" + kerning +
+                ", actualCrispness=" + actualCrispness +
+                ", distanceFieldCrispness=" + distanceFieldCrispness +
+                ", cellWidth=" + cellWidth +
+                ", cellHeight=" + cellHeight +
+                ", originalCellWidth=" + originalCellWidth +
+                ", originalCellHeight=" + originalCellHeight +
+                ", scaleX=" + scaleX +
+                ", scaleY=" + scaleY +
+                ", descent=" + descent +
+                ", solidBlock=" + solidBlock +
+                ", family=" + family +
+                ", integerPosition=" + integerPosition +
+                ", obliqueStrength=" + obliqueStrength +
+                ", boldStrength=" + boldStrength +
+                ", name='" + name + '\'' +
+                ", PACKED_BLACK=" + PACKED_BLACK +
+                ", PACKED_WHITE=" + PACKED_WHITE +
+                ", PACKED_ERROR_COLOR=" + PACKED_ERROR_COLOR +
+                ", PACKED_WARN_COLOR=" + PACKED_WARN_COLOR +
+                ", PACKED_NOTE_COLOR=" + PACKED_NOTE_COLOR +
+                ", xAdjust=" + xAdjust +
+                ", yAdjust=" + yAdjust +
+                ", widthAdjust=" + widthAdjust +
+                ", heightAdjust=" + heightAdjust +
+                ", underX=" + underX +
+                ", underY=" + underY +
+                ", underLength=" + underLength +
+                ", underBreadth=" + underBreadth +
+                ", strikeX=" + strikeX +
+                ", strikeY=" + strikeY +
+                ", strikeLength=" + strikeLength +
+                ", strikeBreadth=" + strikeBreadth +
+                '}';
+    }
+
+    /**
+     * Given a 20-item float array (almost always {@link #vertices} in this class) and a Texture to draw (part of), this
+     * draws some part of the Texture using the given Batch. This is used internally to wrap around calls to
+     * {@link Batch#draw(Texture, float[], int, int)}.
+     * <br>
+     * This is an extension point so Batch implementations that use more attributes than SpriteBatch can still make use
+     * of Font. If not overridden, this will act exactly like calling {@code batch.draw(texture, vertices, 0, 20);}.
+     * <br>
+     * The format this should generally expect for {@code vertices} is the same as what a single Sprite would draw with
+     * SpriteBatch. There are 4 sections in each array, each with 5 floats corresponding to one vertex on a quad. Font
+     * only ever assigns one color (as a packed float, such as from {@link Color#toFloatBits()}) to all four vertices,
+     * but overriding classes don't necessarily need to do this. Where x and y define the lower-left vertex position,
+     * width and height are the axis-aligned dimensions of the quad, color is a packed float, and u/v/u2/v2 are the UV
+     * coordinates to use from {@code texture}, the format looks like:
+     * <pre>
+     *         vertices[0] = x;
+     *         vertices[1] = y;
+     *         vertices[2] = color;
+     *         vertices[3] = u;
+     *         vertices[4] = v;
+     *
+     *         vertices[5] = x;
+     *         vertices[6] = y + height;
+     *         vertices[7] = color;
+     *         vertices[8] = u;
+     *         vertices[9] = v2;
+     *
+     *         vertices[10] = x + width;
+     *         vertices[11] = y + height;
+     *         vertices[12] = color;
+     *         vertices[13] = u2;
+     *         vertices[14] = v2;
+     *
+     *         vertices[15] = x + width;
+     *         vertices[16] = y;
+     *         vertices[17] = color;
+     *         vertices[18] = u2;
+     *         vertices[19] = v;
+     * </pre>
+     * <br>
+     * When a custom Font overrides this to handle a Batch with one extra attribute per-vertex, the custom Font should
+     * have a 24-item float array and copy data from {@code vertices} to its own 24-item float array, then pass that
+     * larger array to {@link Batch#draw(Texture, float[], int, int)}.
+     *
+     * @param batch a Batch, which should be a SpriteBatch (or a compatible Batch) unless this was overridden
+     * @param texture a Texture to draw (part of)
+     * @param vertices a 20-item float array organized into 5-float sections per-vertex
+     */
+    protected void drawVertices(Batch batch, Texture texture, float[] vertices) {
+        batch.draw(texture, vertices, 0, 20);
     }
 }

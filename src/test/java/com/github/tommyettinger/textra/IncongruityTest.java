@@ -44,10 +44,12 @@ public class IncongruityTest extends ApplicationAdapter {
         labels.defaults().pad(5);
         for (int i = 0; i < fonts.length; i++) {
             Font font = fonts[i];
+//            Font font = fonts[i].setDescent(fonts[i].getDescent() * 2);
             labels.add(new Label(font.name, skin)).left();
             TypingLabel label = new TypingLabel("Dummy Text 123", skin, font);
             labels.add(label).expandX().left();
 //            label.validate();
+            Gdx.app.log("Font", font.name + (font.isMono ? " (MONO)" : "") + ", " + label.getPrefWidth() + ", " + label.getPrefHeight() + ", " + font.scaleY);
 
             BitmapFont bf = bitmapFonts[i];
             if (bf != null) {
@@ -56,13 +58,16 @@ public class IncongruityTest extends ApplicationAdapter {
                 style.fontColor = Color.WHITE;
                 Label bmLabel = new Label("Dummy Text 123", style);
                 bmLabel.validate();
-                float scale = label.getPrefHeight()/bmLabel.getPrefHeight();
-                Gdx.app.log("Font", font.name + ", " + label.getPrefHeight() + ", " + bmLabel.getPrefHeight() + ", " + scale);
-                bmLabel.setFontScale(scale);
+                float scaleY = label.getPrefHeight()/bmLabel.getPrefHeight();
+                float scaleX = label.getPrefWidth()/bmLabel.getPrefWidth();
+                Gdx.app.log("BMFont", font.name + ", " + bmLabel.getPrefWidth() + ", " + bmLabel.getPrefHeight()
+                        + ", " + scaleX + ", " + scaleY);
+                bmLabel.setFontScale(bf.getScaleX() * Math.min(scaleX, scaleY), bf.getScaleY() * Math.min(scaleX, scaleY));
                 labels.add(bmLabel).expandX().left();
             } else {
                 labels.add(new Label("MISSING!", skin)).expandX().left();
             }
+            if((i & 1) == 1)
             labels.row();
         }
         root.setFillParent(true);
@@ -82,6 +87,11 @@ public class IncongruityTest extends ApplicationAdapter {
     private BitmapFont[] getFonts () {
         BitmapFont tall = getFont("AStarry");
         tall.getData().setScale(1, 2);
+        // getAStarry(), getAStarry().scaleTo(8, 16).setName("A Starry Tall"), getBitter(), getCanada(),
+        // getCascadiaMono(), getCaveat(), getCozette(), getGentium(), getGentiumUnItalic(), getHanazono(),
+        // getIBM8x16(), getInconsolata(), getIosevka(), getIosevkaSlab(), getKingthingsFoundation(),
+        // getKingthingsPetrock(), getLibertinusSerif(), getNowAlt(), getOpenSans(), getOxanium(), getQuanPixel(),
+        // getRobotoCondensed(), getTangerine(), getYanoneKaffeesatz()
         return new BitmapFont[] {
                 getFont("AStarry"),
                 tall,
@@ -91,6 +101,7 @@ public class IncongruityTest extends ApplicationAdapter {
                 getFont("Caveat"),
                 getFont("Cozette"),
                 getFont("Gentium"),
+                getFont("GentiumUnItalic"),
                 getFont("Hanazono"),
                 // cant load this one, wrong format
 //			getFont("IBM-8x16"),
@@ -99,7 +110,9 @@ public class IncongruityTest extends ApplicationAdapter {
                 getFont("Iosevka"),
                 getFont("Iosevka-Slab"),
                 getFont("KingthingsFoundation"),
+                getFont("KingthingsPetrock"),
                 getFont("LibertinusSerif"),
+                getFont("Now-Alt"),
                 getFont("OpenSans"),
                 getFont("Oxanium"),
                 getFont("QuanPixel"),
@@ -135,9 +148,9 @@ public class IncongruityTest extends ApplicationAdapter {
     public static void main(String[] args){
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("TextraLabel Incongruity test");
-        config.setWindowedMode(800, 900);
+        config.setWindowedMode(1350, 700);
         config.disableAudio(true);
-		config.setForegroundFPS(Lwjgl3ApplicationConfiguration.getDisplayMode().refreshRate);
+        config.setForegroundFPS(Lwjgl3ApplicationConfiguration.getDisplayMode().refreshRate);
         config.useVsync(true);
         new Lwjgl3Application(new IncongruityTest(), config);
     }

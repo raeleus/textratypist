@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 See AUTHORS file.
+ * Copyright (c) 2021-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,6 @@ package com.github.tommyettinger.textra;
 import com.badlogic.gdx.graphics.Colors;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.reflect.ClassReflection;
-import com.badlogic.gdx.utils.reflect.Constructor;
-import com.badlogic.gdx.utils.reflect.ReflectionException;
 import com.github.tommyettinger.textra.utils.CaseInsensitiveIntMap;
 import com.github.tommyettinger.textra.utils.Palette;
 import regexodus.Matcher;
@@ -30,11 +27,11 @@ import regexodus.REFlags;
 import regexodus.Replacer;
 
 /**
- * Utility class to parse tokens from a {@link TypingLabel}.
+ * Utility class to parse tokens from a {@link TypingLabel}; not intended for external use in most situations.
  */
-class Parser {
+public class Parser {
     private static final Pattern PATTERN_MARKUP_STRIP = Pattern.compile("((?<!\\[)\\[[^\\[\\]]*(\\]|$))");
-    private static final Replacer MARKUP_TO_TAG = new Replacer(Pattern.compile("(?<!\\[)\\[([^\\[\\]\\+][^\\[\\]]*)(\\]|$)"), "{STYLE=$1}");
+    private static final Replacer MARKUP_TO_TAG = new Replacer(Pattern.compile("(?<!\\[)\\[([^ \\[\\]\\+][^\\[\\]]*)(\\]|$)"), "{STYLE=$1}");
     private static final Pattern PATTERN_COLOR_HEX_NO_HASH = Pattern.compile("[A-Fa-f0-9]{6,8}");
 
     private static final CaseInsensitiveIntMap BOOLEAN_TRUE = new CaseInsensitiveIntMap(new String[]{"true", "yes", "t", "y", "on", "1"}, new int[6]);
@@ -45,14 +42,22 @@ class Parser {
     private static String RESET_REPLACEMENT;
 
 
-    static String preprocess(CharSequence text) {
-        return MARKUP_TO_TAG.replace(text).replace("[]", "{RESET}");
+    /**
+     * Replaces any style tags using square brackets, such as <code>[_]</code> for underline, with the syntax
+     * <code>{STYLE=_}</code> (changing {@code _} based on what was in the square brackets). This also changes
+     * <code>[]</code> to <code>{RESET}</code>. This won't change escaped
+     * brackets or the inline image syntax that uses <code>[+name of an image in an atlas]</code>.
+     * @param text text that could have square-bracket style markup
+     * @return {@code text} with square bracket style markup changed to curly-brace style markup
+     */
+    public static String preprocess(CharSequence text) {
+        return MARKUP_TO_TAG.replace(text).replace("[ ]", "{RESET}").replace("[]", "{UNDO}");
     }
 
     /**
      * Parses all tokens from the given {@link TypingLabel}.
      */
-    static void parseTokens(TypingLabel label) {
+    public static void parseTokens(TypingLabel label) {
         // Compile patterns if necessary
         if (PATTERN_TOKEN_STRIP == null || TypingConfig.dirtyEffectMaps) {
             PATTERN_TOKEN_STRIP = compileTokenPattern();
@@ -85,17 +90,15 @@ class Parser {
      */
     private static void parseReplacements(TypingLabel label) {
         // Get text
-        CharSequence text = label.workingLayout.appendIntoDirect(new StringBuilder());
+        CharSequence text = label.layout.appendIntoDirect(new StringBuilder());
 
         // Create string builder
-        StringBuilder sb = new StringBuilder(text.length());
         Matcher m = PATTERN_TOKEN_STRIP.matcher(text);
         int matcherIndexOffset = 0;
 
         // Iterate through matches
         while (true) {
             // Reset StringBuilder and matcher
-            sb.setLength(0);
             m.setTarget(text);
             m.setPosition(matcherIndexOffset);
 
@@ -156,8 +159,18 @@ class Parser {
                     // Make sure we're not inserting "null" to the text.
                     if (replacement == null) replacement = param.toUpperCase();
                     break;
+                case IF:
+                    // Process token
+                    replacement = processIfToken(label, param);
+
+                    // Make sure we're not inserting "null" to the text.
+                    if(replacement == null) replacement = param.toUpperCase();
+                    break;
                 case RESET:
                     replacement = RESET_REPLACEMENT + label.getDefaultToken();
+                    break;
+                case UNDO:
+                    replacement = "[]";
                     break;
                 default:
                     // We don't want to process this token now. Move one index forward to continue the search
@@ -172,6 +185,71 @@ class Parser {
 
         // Set new text
         label.setIntermediateText(text, false, false);
+    }
+
+    private static String processIfToken(TypingLabel label, String paramsString) {
+        // Split params
+        final String[] params = paramsString == null ? new String[0] : paramsString.split(";");
+        final String variable = params.length > 0 ? params[0] : null;
+
+        // Ensure our params are valid
+        if(params.length <= 1 || variable == null) {
+            return null;
+        }
+
+        /*
+            Get variable's value
+         */
+        String variableValue = null;
+
+        // Try to get value through listener.
+        if(label.getTypingListener() != null) {
+            variableValue = label.getTypingListener().replaceVariable(variable);
+        }
+
+        // If value is null, get it from maps.
+        if(variableValue == null) {
+            variableValue = label.getVariables().get(variable.toUpperCase());
+        }
+
+        // If value is still null, get it from global scope
+        if(variableValue == null) {
+            variableValue = TypingConfig.GLOBAL_VARS.get(variable.toUpperCase());
+        }
+
+        // Ensure variable is never null
+        if(variableValue == null) {
+            variableValue = "";
+        }
+
+        // Iterate through params and try to find a match
+        String defaultValue = null;
+        for(int i = 1, n = params.length; i < n; i++) {
+            String[] subParams = params[i].split("=", 2);
+            String key = subParams[0];
+            String value = subParams[subParams.length - 1];
+            boolean isKeyValid = subParams.length > 1 && !key.isEmpty();
+
+            // If key isn't valid, it must be a default value. Store it and carry on
+            if(!isKeyValid) {
+                defaultValue = value;
+                break;
+            }
+
+            // Compare variable's value with key
+            if(variableValue.equalsIgnoreCase(key)) {
+                return value;
+            }
+        }
+
+        // Try to return any default values captured during the iteration
+        if(defaultValue != null) {
+            return defaultValue;
+        }
+
+        // If we got this far, no values matched our variable.
+        // Return the variable itself, which might be useful for debugging.
+        return variable;
     }
 
     /**
@@ -252,19 +330,19 @@ class Parser {
                             break;
                         }
                         case "SLOWER":
-                            floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR / 0.500f;
+                            floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR * 2f;
                             break;
                         case "SLOW":
-                            floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR / 0.667f;
+                            floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR * 1.5f;
                             break;
                         case "NORMAL":
                             floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR;
                             break;
                         case "FAST":
-                            floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR / 2.000f;
+                            floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR * 0.5f;
                             break;
                         case "FASTER":
-                            floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR / 4.000f;
+                            floatValue = TypingConfig.DEFAULT_SPEED_PER_CHAR * 0.25f;
                             break;
                         case "NATURAL": {
                             float minModifier = TypingConfig.MIN_SPEED_MODIFIER;
@@ -277,20 +355,9 @@ class Parser {
                     break;
                 }
                 case EFFECT_START: {
-                    Class<? extends Effect> clazz = TypingConfig.EFFECT_START_TOKENS.get(tokenName.toUpperCase());
-                    try {
-                        if (clazz != null) {
-                            Constructor constructor = ClassReflection.getConstructors(clazz)[0];
-                            int constructorParamCount = constructor.getParameterTypes().length;
-                            if (constructorParamCount >= 2) {
-                                effect = (Effect) constructor.newInstance(label, params);
-                            } else {
-                                effect = (Effect) constructor.newInstance(label);
-                            }
-                        }
-                    } catch (ReflectionException e) {
-                        String message = "Failed to initialize " + tokenName + " effect token. Make sure the associated class (" + clazz + ") has only one constructor with TypingLabel as first parameter and optionally String[] as second.";
-                        throw new IllegalStateException(message, e);
+                    Effect.EffectBuilder eb = TypingConfig.EFFECT_START_TOKENS.get(tokenName.toUpperCase());
+                    if (eb != null) {
+                        effect = eb.produce(label, params);
                     }
                     break;
                 }
@@ -333,8 +400,9 @@ class Parser {
 
     /**
      * Returns a float value parsed from the given String, or the default value if the string couldn't be parsed.
+     * This can be useful in Effects.
      */
-    static float stringToFloat(String str, float defaultValue) {
+    public static float stringToFloat(String str, float defaultValue) {
         if (str != null) {
             try {
                 return Float.parseFloat(str.replaceAll("[^\\d.\\-+]", ""));
@@ -346,8 +414,9 @@ class Parser {
 
     /**
      * Returns a boolean value parsed from the given String, or the default value if the string couldn't be parsed.
+     * This can be useful in Effects.
      */
-    static boolean stringToBoolean(String str) {
+    public static boolean stringToBoolean(String str) {
         if (str != null) {
             return BOOLEAN_TRUE.containsKey(str);
         }
@@ -356,8 +425,9 @@ class Parser {
 
     /**
      * Parses a color from the given string. Returns null if the color couldn't be parsed.
+     * This can be useful in Effects.
      */
-    static int stringToColor(TypingLabel label, String str) {
+    public static int stringToColor(TypingLabel label, String str) {
         if (str != null) {
 
             // Try to parse named color
@@ -385,7 +455,7 @@ class Parser {
     /**
      * Encloses the given string in brackets to work as a regular color markup tag.
      */
-    private static String stringToColorMarkup(String str) {
+    public static String stringToColorMarkup(String str) {
         if (str != null) {
             // If color isn't registered by name, try to parse it as a hex code.
             if (str.length() >= 6 && !Palette.NAMED.containsKey(str) && PATTERN_COLOR_HEX_NO_HASH.matches(str)) {
@@ -400,10 +470,12 @@ class Parser {
     /**
      * Matches style names to syntax and encloses the given string in brackets to work as a style markup tag.
      */
-    private static String stringToStyleMarkup(String str) {
+    public static String stringToStyleMarkup(String str) {
         if (str != null) {
-            if(str.isEmpty())
+            if(str.isEmpty() || str.equalsIgnoreCase("UNDO"))
                 return "[]";
+            if (str.equals(" "))
+                return "[ ]";
             if (str.equals("*") || str.equalsIgnoreCase("B") || str.equalsIgnoreCase("BOLD") || str.equalsIgnoreCase("STRONG"))
                 return "[*]";
             if (str.equals("/") || str.equalsIgnoreCase("I") || str.equalsIgnoreCase("OBLIQUE") || str.equalsIgnoreCase("ITALIC"))
@@ -426,6 +498,24 @@ class Parser {
                 return "[;]";
             if (str.equals("@") || str.equalsIgnoreCase("NOFONT") || str.equalsIgnoreCase("ENDFONT"))
                 return "[@]";
+            if (str.equalsIgnoreCase("JOSTLE") || str.equalsIgnoreCase("WOBBLE") || str.equalsIgnoreCase("SCATTER"))
+                return "[%?]";
+            if (str.equalsIgnoreCase("BLACK OUTLINE") || str.equalsIgnoreCase("BLACKEN"))
+                return "[%?black outline]";
+            if (str.equalsIgnoreCase("WHITE OUTLINE") || str.equalsIgnoreCase("WHITEN"))
+                return "[%?white outline]";
+            if (str.equalsIgnoreCase("SHINY") || str.equalsIgnoreCase("SHINE") || str.equalsIgnoreCase("GLOSSY"))
+                return "[%?shiny]";
+            if (str.equalsIgnoreCase("SHADOW") || str.equalsIgnoreCase("DROPSHADOW") || str.equalsIgnoreCase("DROP SHADOW"))
+                return "[%?shadow]";
+            if (str.equalsIgnoreCase("ERROR") || str.equalsIgnoreCase("REDLINE") || str.equalsIgnoreCase("RED LINE"))
+                return "[%?error]";
+            if (str.equalsIgnoreCase("WARN") || str.equalsIgnoreCase("YELLOWLINE") || str.equalsIgnoreCase("YELLOW LINE"))
+                return "[%?warn]";
+            if (str.equalsIgnoreCase("NOTE") || str.equalsIgnoreCase("INFO") || str.equalsIgnoreCase("BLUELINE") || str.equalsIgnoreCase("BLUE LINE"))
+                return "[%?note]";
+            if (str.equalsIgnoreCase("SMALLCAPS") || str.equalsIgnoreCase("SMALL CAPS"))
+                return "[%^]";
             if (str.equals("%") || str.equalsIgnoreCase("NOSCALE") || str.equalsIgnoreCase("ENDSCALE")
                     || str.equalsIgnoreCase("NOMODE") || str.equalsIgnoreCase("ENDMODE"))
                 return "[%]";
@@ -471,7 +561,7 @@ class Parser {
         TypingConfig.EFFECT_END_TOKENS.keys().toArray(tokens);
         tokens.add("NORMAL");
 
-        StringBuilder sb = new StringBuilder("[]");
+        StringBuilder sb = new StringBuilder("[ ]");
         for (String token : tokens) {
             sb.append('{').append(token).append('}');
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,8 +55,16 @@ public class TypingWindow extends TextraWindow {
         super(title, skin, styleName, replacementFont);
     }
 
+    public TypingWindow(String title, Skin skin, String styleName, Font replacementFont, boolean scaleTitleFont) {
+        super(title, skin, styleName, replacementFont, scaleTitleFont);
+    }
+
     public TypingWindow(String title, Window.WindowStyle style, Font replacementFont) {
         super(title, style, replacementFont);
+    }
+
+    public TypingWindow(String title, Window.WindowStyle style, Font replacementFont, boolean scaleTitleFont) {
+        super(title, style, replacementFont, scaleTitleFont);
     }
 
     @Override

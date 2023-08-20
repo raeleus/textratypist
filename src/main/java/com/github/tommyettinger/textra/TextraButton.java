@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -145,6 +145,7 @@ public class TextraButton extends Button {
 
     public void setTextraLabel(TextraLabel label) {
         if (label == null) throw new IllegalArgumentException("label cannot be null.");
+        if(this.label == label) return;
         getTextraLabelCell().setActor(label);
         this.label = label;
     }
@@ -157,6 +158,11 @@ public class TextraButton extends Button {
         return getCell(label);
     }
 
+    /**
+     * A no-op unless {@code label.getFont()} is a subclass that overrides {@link Font#handleIntegerPosition(float)}.
+     * @param integer usually ignored
+     * @return this for chaining
+     */
     public TextraButton useIntegerPositions(boolean integer) {
         label.getFont().integerPosition = integer;
         return this;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 See AUTHORS file.
+ * Copyright (c) 2021-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ public class EmergeEffect extends Effect {
     public EmergeEffect(TypingLabel label, String[] params) {
         super(label);
 
-        // Distance
+        // Intensity
         if (params.length > 0) {
             this.intensity = 1.0f / paramAsFloat(params[0], 0.25f);
         }

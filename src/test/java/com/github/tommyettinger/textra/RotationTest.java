@@ -18,10 +18,13 @@ package com.github.tommyettinger.textra;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.profiling.GLProfiler;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -36,6 +39,8 @@ public class RotationTest extends ApplicationAdapter {
     Layout layout;
     long startTime;
 
+    GLProfiler profiler;
+
     static final int PIXEL_WIDTH = 800, PIXEL_HEIGHT = 640;
 
     public static void main(String[] args){
@@ -43,15 +48,21 @@ public class RotationTest extends ApplicationAdapter {
         config.setTitle("Font test");
         config.setWindowedMode(PIXEL_WIDTH, PIXEL_HEIGHT);
         config.disableAudio(true);
-        config.useVsync(false);
+        config.useVsync(true);
         config.setForegroundFPS(0);
         new Lwjgl3Application(new RotationTest(), config);
     }
 
     @Override
     public void create() {
+        profiler = new GLProfiler(Gdx.graphics);
+        profiler.enable();
+
         batch = new SpriteBatch();
-        font = KnownFonts.getInconsolata().scaleTo(16, 32);
+//        font = new Font("RaeleusScriptius-standard.fnt", 0, 14, 0, 0).scale(0.75f, 0.75f);
+        font = KnownFonts.getGentiumUnItalic().scaleTo(42, 32);
+//        font = KnownFonts.getAStarry().scaleTo(16, 32);
+//        font = KnownFonts.getInconsolata().scaleTo(16, 32);
 //        font = KnownFonts.getCascadiaMono().scaleTo(12, 24);
 //        font = KnownFonts.getIosevka();
 //        font = KnownFonts.getIosevkaSlab().scale(0.75f, 0.75f);
@@ -68,8 +79,10 @@ public class RotationTest extends ApplicationAdapter {
 //        font = KnownFonts.getCanada().scaleTo(40, 58);
 //        font = KnownFonts.getRobotoCondensed().scaleTo(37, 53);
 
-        font.fitCell(font.cellWidth, font.cellHeight, true);
+//        font.fitCell(font.cellWidth, font.cellHeight, true);
 //        font.fitCell(24, 24, true);
+
+//        font.kerning = null; // for debugging
 
         layout = new Layout(font).setTargetWidth(Gdx.graphics.getWidth());
         backgrounds = new int[(int) Math.ceil(PIXEL_WIDTH / font.cellWidth)][(int) Math.ceil(PIXEL_HEIGHT / font.cellHeight)];
@@ -99,14 +112,14 @@ public class RotationTest extends ApplicationAdapter {
 //        font.markup("\n[*]Водяной[] — в славянской мифологии дух, обитающий в воде, хозяин вод[^][BLUE][[2][]."
 //                + "\nВоплощение стихии воды как отрицательного и опасного начала[^][BLUE][[3][[citation needed][].", layout);
 //
-        font.markup("Test [*]TEST [/]Test [*]TEST[][.]test [=]Test [^]TEST [][_]Test [~]test[_] Test[]"
-                        + "\n┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬"
-                        + "\nThe [#800000]MAW[] of the [/][#66DDFF]wendigo[/] (wendigo)[] [*]appears[*]!"
-                        + "\nThe [_][#666666]BLADE[] of [*][/][#FFFF44]DYNAST-KINGS[] strikes!"
-                        + "\n[_][;]Each cap, [,]All lower, [!]Caps lock[], [?]Unknown[]?"
-                        + "\n[#BBAA44]φ[] = (1 + 5[^]0.5[^]) * 0.5 ┼┌─┤"
-                        + "\n[#FF8822]¿Qué son estos? ¡Arribate, mijo![]"
-                        + "\nPchnąć[] w tę łódź [#775522]jeża[] lub ośm skrzyń [#CC00CC]fig[]."
+        font.markup("Test [*]TEST [/]Test [*]TEST[ ][.]test [=]Test [^]TEST [ ][_]Test [~]te[RED]s[WHITE]t[_] Test[ ]"
+                        + "\n┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬┴┬[RED]┴[ ]┬┴"
+                        + "\nThe [#800000]MAW[ ] of the [/][#66DDFF]wendigo[/][ ] ([~]wendigo[ ]) [*]appears[*]!"
+                        + "\nThe [_][#666666]BLADE[ ] of [*][/][#FFFF44]DYNAST-KINGS[ ] strikes!"
+                        + "\n[_][;]Each cap, [,]All lower, [!]Caps lock[ ], [?]Unknown[ ]?"
+                        + "\n[#BBAA44]φ[ ] = (1 + 5[^]0.5[^]) * 0.5 ┼┌─┤"
+                        + "\n[#FF8822]¿Qué son estos? ¡Arribate, mijo![ ]"
+                        + "\nPchnąć[ ] w tę łódź [#775522]jeża[ ] lub ośm skrzyń [#CC00CC]fig[ ]."
                 , layout);
 
 //        font.markup("\"You are ever more the [/]fool[/] than the pitiable cutpurse who [*]dares waylay[*] my castle road!\" the [dark rich gold]King[] admonished."
@@ -124,19 +137,22 @@ public class RotationTest extends ApplicationAdapter {
 
     @Override
     public void render() {
+        profiler.reset();
         ScreenUtils.clear(0.4f, 0.5f, 0.9f, 1);
         
         float x = 0, y = layout.getHeight() + font.cellHeight * 2;
         batch.begin();
         font.enableShader(batch);
+        batch.setPackedColor(Color.WHITE_FLOAT_BITS);
 
         font.drawBlocks(batch, backgrounds, 0f, 0f);
         long since = TimeUtils.timeSinceMillis(startTime);
-        for (float g = y; g < PIXEL_HEIGHT; g+= font.cellHeight) {
+        for (float g = 0; g < PIXEL_HEIGHT; g+= font.cellHeight) {
 
-            font.drawGlyph(batch, 0xBB0011FE00200000L | '&',
+            font.drawGlyph(batch, 0xBB0011FE00000000L | '&',//0xBB0011FE00200000L
 //                    2f * font.cellWidth,
-                    (MathUtils.sinDeg(since * 0.01f + g) * 0.4f + 0.5f) * font.cellWidth * backgrounds.length, g,
+                    (MathUtils.sinDeg(10f * g) * 0.4f + 0.5f) * font.cellWidth * backgrounds.length, g,
+//                    (MathUtils.sinDeg(since * 0.01f + g) * 0.4f + 0.5f) * font.cellWidth * backgrounds.length, g,
                     since * 0.0625f);
         }
 //        switch ((int)((since >>> 12) % 3)) {
@@ -148,7 +164,7 @@ public class RotationTest extends ApplicationAdapter {
 //            case 1:
                 font.drawGlyphs(batch, layout,
                         PIXEL_WIDTH * 0.5f, y, Align.center
-                        , since * 0.05f, 0f, 0f
+                        , since * 0.015f, 0f, 0f
                 );
 //            break;
 //            default:
@@ -160,6 +176,12 @@ public class RotationTest extends ApplicationAdapter {
         font.drawText(batch, Gdx.graphics.getFramesPerSecond() + " FPS",
                 font.cellWidth, Gdx.graphics.getHeight() - font.cellHeight * 2, 0x227711FE);
         batch.end();
+        if(Gdx.input.isKeyJustPressed(Input.Keys.SPACE))
+            System.out.printf("Calls: %d, draw calls: %d, shader switches: %d, texture bindings: %d, FPS: %d\n",
+                    profiler.getCalls(), profiler.getDrawCalls(),
+                    profiler.getShaderSwitches(), profiler.getTextureBindings(),
+                    Gdx.graphics.getFramesPerSecond());
+
     }
 
     @Override

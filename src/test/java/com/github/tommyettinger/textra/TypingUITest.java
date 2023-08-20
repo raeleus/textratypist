@@ -61,7 +61,7 @@ public class TypingUITest extends InputAdapter implements ApplicationListener {
 		TextureRegion imageFlipped = new TextureRegion(image);
 		imageFlipped.flip(true, true);
 		TextureRegion image2 = new TextureRegion(texture2);
-		final Font font = KnownFonts.getStandardFamily();
+		final Font.FontFamily family = KnownFonts.getStandardFamily().family;
 //		final Font font =
 //				//KnownFonts.getYanoneKaffeesatz();
 //				new Font(skin.getFont("outline-font"), 0f, 12f, 0f, 0f);//.adjustLineHeight(1.2f);
@@ -69,13 +69,17 @@ public class TypingUITest extends InputAdapter implements ApplicationListener {
 //				new Font(skin.get(Label.LabelStyle.class).font)
 //				.useIntegerPositions(true);
 //		font.family = new Font.FontFamily(KnownFonts.getStandardFamily().family);
-		font.family.connected[11] =
+		family.connected[11] =
 //				font;
 				KnownFonts.getYanoneKaffeesatz()
 //				new Font(new BitmapFont(Gdx.files.internal("YanoneKaffeesatz-standard.fnt")))
 				.scaleTo(30, 35);
 //				.setName("Yanone Kaffeesatz");
-		font.family.connected[0] = font;
+		family.connected[0] = KnownFonts.getNowAlt();
+//		family.connected[11].originalCellHeight *= 0.75f;
+//		family.connected[0].originalCellHeight *= 0.75f;
+		Font font = family.connected[0];
+		font.family = family;
 //		font.family.connected[11].scaleTo(font.family.connected[11].originalCellWidth, font.family.connected[11].originalCellHeight);
 		for(Font f : font.family.connected) {
 			if(f != null)
@@ -92,6 +96,20 @@ public class TypingUITest extends InputAdapter implements ApplicationListener {
 		ImageTypingButton iconButton = new ImageTypingButton("jóÓetcjóÓetcjóÓetc", style, font);
 //		ImageTextraButton iconButton = new ImageTextraButton("[/]a e s t h e t i c", style, font);
 
+//		TypingButton buttonMulti = new TypingButton("", skin, "toggle", font);
+//		TypingLabel fancyLabel = new TypingLabel("", font){
+//			@Override
+//			public void act(float delta) {
+//				if(System.currentTimeMillis() % 5000 > 4940) {
+//					restart("[DARK-bright-raspberry-magenta-rose-red-ember]So juicy and red! You could probably collect them on a mountain..");
+//				}
+//				super.act(delta);
+//			}
+//		};
+//		fancyLabel.debug();
+//		buttonMulti.setTextraLabel(fancyLabel);
+//		fancyLabel.setWrap(true);
+//		buttonMulti.getTextraLabelCell().width(403);
 		TypingButton buttonMulti = new TypingButton("jóÓetc\nÓjóetc\ncjóÓet", skin, "toggle", font);
 //		Button buttonMulti = new TextraButton("Multi\nLine\nToggle", skin, "toggle");
 		Button imgButton = new Button(new Image(image), skin);
@@ -135,7 +153,7 @@ public class TypingUITest extends InputAdapter implements ApplicationListener {
 		fpsLabel = new TypingLabel("fps: 0    [^][SKY][[citation needed]", skin, font);
 		fpsLabel.setAlignment(Align.center);
 		// configures an example of a TextField in password mode.
-		final TypingLabel passwordLabel = new TypingLabel("[@Medieval]Textfield in [~]secure[] password mode: ", skin, font);
+		final TypingLabel passwordLabel = new TypingLabel("[@Medieval]Textfield in [~]secure[ ] password mode: ", skin, font);
 		final TextField passwordTextField = new TextField("", skin);
 		passwordTextField.setMessageText("password");
 		passwordTextField.setPasswordCharacter('*');
@@ -150,16 +168,21 @@ public class TypingUITest extends InputAdapter implements ApplicationListener {
 		imgButton.addListener(new Tooltip<>(tooltipTable));
 
 		// window.debug();
-		TypingWindow window = new TypingWindow("TypingWindow", skin);
-		window.font.adjustLineHeight(0.75f);
-		window.getTitleTable().add(new TextraButton("X", skin)).height(window.getPadTop());
-		window.getTitleTable().add(new TypingButton("X", skin)).height(window.getPadTop());
+		TypingWindow window = new TypingWindow("TypingWindow", skin, "default", font, true);
+//		window.font.adjustLineHeight(0.75f);
+//		float ratio = window.getPadTop() / font.cellHeight;
+//		Font baby = new Font(font).scaleTo(font.cellWidth * ratio, window.getPadTop());//.scale(ratio, ratio);
+		window.getTitleTable().add(new TextraButton("X", skin, window.titleLabel.font)).height(window.getPadTop());
+		window.getTitleTable().add(new TypingButton("X", skin, window.titleLabel.font)).height(window.getPadTop());
 		window.getTitleTable().add(new TextButton("X", skin)).height(window.getPadTop());
 		window.setPosition(0, 0);
 		window.defaults().spaceBottom(10);
 		window.row().fill().expandX();
 		window.add(iconButton);
+
 		window.add(buttonMulti);
+//		window.add(fancyLabel).width(403);
+
 		window.add(imgButton);
 		window.add(imgToggleButton);
 		window.row();

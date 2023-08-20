@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 See AUTHORS file.
+ * Copyright (c) 2021-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package com.github.tommyettinger.textra.effects;
 import com.badlogic.gdx.math.MathUtils;
 import com.github.tommyettinger.textra.Effect;
 import com.github.tommyettinger.textra.TypingLabel;
-import com.github.tommyettinger.textra.utils.ColorUtils;
 
 /**
  * Blinks the entire text in two different colors at once, without interpolation.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 See AUTHORS file.
+ * Copyright (c) 2021-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,11 @@ public enum TokenCategory {
     SPEED,
     COLOR,
     VARIABLE,
+    IF,
     EVENT,
     RESET,
     SKIP,
     EFFECT_START,
-    EFFECT_END
+    EFFECT_END,
+    UNDO
 }

@@ -11,6 +11,9 @@ import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.TimeUtils;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.utils.viewport.StretchViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
 
 import java.nio.ByteBuffer;
 
@@ -18,55 +21,29 @@ public class PreviewGenerator extends ApplicationAdapter {
 
     Font fnt;
     SpriteBatch batch;
-    Layout layout = new Layout().setTargetWidth(800);
-    Array<String> colorNames;
+    Viewport viewport;
+    Layout layout = new Layout().setTargetWidth(1200);
     long startTime;
     static final String text = "Fonts can be rendered normally,{CURLY BRACKETS ARE IGNORED} but using [[tags], you can..."
             + "\n[#E74200]...use CSS-style hex colors like [*]#E74200[*]..."
-            + "\n[darker purple blue]...use color names or descriptions, like [/]darker purple blue[/]...[]"
+            + "\n[darker purple blue]...use color names or descriptions, like [/]darker purple blue[/]...[ ]"
             + "\n[_]...and use [!]effects[!][_]!"
-            + "\nNormal, [*]bold[*], [/]oblique[/] (like italic), [*][/]bold oblique[],"
-            + "\n[_]underline (even for multiple words)[_], [~]strikethrough (same)[],"
-            + "\nscaling: [%50]very [%75]small [%100]to [%150]quite [%200]large[], notes: [.]sub-[.], [=]mid-[=], and [^]super-[^]script,"
-            + "\ncapitalization changes: [;]Each cap, [,]All lower, [!]Caps lock[],"
-            + "\nUnicode support: Pchnąć w tę łódź [BROWN]jeża[] lub ośm skrzyń [PURPLE]fig[].",
-    distanceField = "\nWelcome to the [_][*][TEAL]Textra Zone[]!",
-    emojiSupport = "\nPlus, there's [_][*][TEAL]emoji[] and more! [WHITE][+🥳] [+👍🏻] [+🤙🏼] [+👌🏽] [+🤘🏾] [+✌🏿]";
-/*
-AStarry-standard.fnt has descent: -12
-AStarry-msdf.fnt has descent: -94
-Bitter-standard.fnt has descent: -38
-Canada1500-standard.fnt has descent: -15
-CascadiaMono-msdf.fnt has descent: -10
-Cozette-standard.fnt has descent: -3
-DejaVuSansMono-msdf.fnt has descent: 3
-Gentium-standard.fnt has descent: -31
-Gentium-sdf.fnt has descent: -18
-Hanazono-standard.fnt has descent: -5
-Inconsolata-LGC-Custom-standard.fnt has descent: -18
-Inconsolata-LGC-Custom-msdf.fnt has descent: -10
-Iosevka-standard.fnt has descent: -17
-Iosevka-msdf.fnt has descent: 5
-Iosevka-sdf.fnt has descent: 0
-Iosevka-Slab-standard.fnt has descent: -17
-Iosevka-Slab-msdf.fnt has descent: 5
-Iosevka-Slab-sdf.fnt has descent: 0
-KingthingsFoundation-standard.fnt has descent: -40
-LibertinusSerif-Regular-msdf.fnt has descent: 17
-OpenSans-standard.fnt has descent: -11
-Oxanium-standard.fnt has descent: -20
-RobotoCondensed-standard.fnt has descent: -13
-YanoneKaffeesatz-standard.fnt has descent: -19
+            + "\nNormal, [*]bold[*], [/]oblique[/] (like italic), [*][/]bold oblique[ ],"
+            + "\n[_]underline (even for multiple words)[_], [~]strikethrough (same)[ ],"
+            + "\nscaling: [%50]very [%75]small [%100]to [%150]quite [%200]large[ ], notes: [.]sub-[.], [=]mid-[=], and [^]super-[^]script,"
+            + "\ncapitalization changes: [;]Each cap, [,]All lower, [!]Caps lock[ ],"
+            + "\n[%^small caps][*]Special[*] [%^whiten][/]Effects[/][%]: [%?shadow]drop shadow[%], [%?jostle]RaNsoM nOtE[%], [%?error]spell check[%],",
+    distanceField = "\nWelcome to the [_][*][TEAL]Textra Zone[ ]!",
+    emojiSupport = "\nPlus, there's [_][*][TEAL]emoji[ ] and more! [WHITE][+🥳] [+👍🏻] [+🤙🏼] [+👌🏽] [+🤘🏾] [+✌🏿]";
 
-*/
     public static void main(String[] args){
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("Font Preview Generator");
-        config.setWindowedMode(800, 500);
+        config.setWindowedMode(1200, 675);
         config.disableAudio(true);
         ShaderProgram.prependVertexCode = "#version 110\n";
         ShaderProgram.prependFragmentCode = "#version 110\n";
-        config.enableGLDebugOutput(true, System.out);
+//        config.enableGLDebugOutput(true, System.out);
         config.setForegroundFPS(1);
         config.useVsync(true);
         new Lwjgl3Application(new PreviewGenerator(), config);
@@ -75,7 +52,7 @@ YanoneKaffeesatz-standard.fnt has descent: -19
     @Override
     public void create() {
         batch = new SpriteBatch();
-        colorNames = Colors.getColors().keys().toArray();
+        viewport = new StretchViewport(1200, 675);
 
         // investigating a GPU-related bug... seems fixed now, sometimes?
         // with useIntegerPositions(true), on some discrete GPUs this looks "wobbly," with an uneven baseline.
@@ -83,10 +60,14 @@ YanoneKaffeesatz-standard.fnt has descent: -19
 //        Font[] fonts = {KnownFonts.getCozette().useIntegerPositions(true)};
 //        Font[] fonts = {KnownFonts.getGentiumSDF()};
         Font[] fonts = KnownFonts.getAll();
-        fnt = fonts[fonts.length - 1];
+        fnt = fonts[13];
+//        fnt = fonts[fonts.length - 1];
         Gdx.files.local("out/").mkdirs();
         int index = 0;
-        for (Font font : fonts) {
+        for (int i = 0; i < fonts.length; i++) {
+            Font font = fonts[i];
+            if(!font.integerPosition)
+                font.scale(1.5f, 1.5f);
 //        Font font = fnt = fonts[0]; {
             KnownFonts.addEmoji(font);
             font.resizeDistanceField(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
@@ -124,7 +105,7 @@ YanoneKaffeesatz-standard.fnt has descent: -19
             layout.setEllipsis(" and so on and so forth...");
 //            font.markup("[%300][#44DD22]digital[%]\n[#66EE55]just numeric things \n"
 //                    , layout);
-            font.markup(text + (font.distanceField == Font.DistanceFieldType.STANDARD ? emojiSupport : distanceField), layout);
+            font.markup(text + (font.distanceField != Font.DistanceFieldType.MSDF ? emojiSupport : distanceField), layout);
 //        font.markup("I wanna thank you all for coming here tonight..."
 //                + "\n[#22BB22FF]Hello, [~]World[~]Universe[.]$[=]$[^]$[^]!"
 //                + "\nThe [RED]MAW[] of the [/][CYAN]wendigo[/] (wendigo)[] [*]appears[*]!"
@@ -140,9 +121,8 @@ YanoneKaffeesatz-standard.fnt has descent: -19
 //                + "\nВоплощение стихии воды как отрицательного и опасного начала[^][BLUE][[3][].", layout);
 
             ScreenUtils.clear(0.75f, 0.75f, 0.75f, 1f);
-//            ScreenUtils.clear(0.3f, 0.3f, 0.3f, 1f);
-//        layout.getLine(0).glyphs.set(0, font.markupGlyph('@', "[" + colorNames.get((int)(TimeUtils.timeSinceMillis(startTime) >>> 8) % colorNames.size) + "]"));
-            float x = 400, y = layout.getHeight() + font.handleIntegerPosition(font.cellHeight * 0.5f);// - font.descent * font.scaleY;
+            float x = Gdx.graphics.getBackBufferWidth() * 0.5f;
+            float y = (Gdx.graphics.getBackBufferHeight() + layout.getHeight()) * 0.5f - font.descent * font.scaleY;
             batch.begin();
             font.enableShader(batch);
             font.drawGlyphs(batch, layout, x, y, Align.center);
@@ -156,23 +136,24 @@ YanoneKaffeesatz-standard.fnt has descent: -19
             // End Pixmap.createFromFrameBuffer() modified code
 
 //            Pixmap pm = Pixmap.createFromFrameBuffer(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
-            PixmapIO.writePNG(Gdx.files.local("out/image"+(index++) + ".png"), pm, 6, true);
-
+            PixmapIO.writePNG(Gdx.files.local("out/" + font.name + ".png"), pm, 2, true);
+            index++;
         }
 //        System.out.println(layout);
         startTime = TimeUtils.millis();
-        fnt.markup(text + (fnt.distanceField == Font.DistanceFieldType.STANDARD ? emojiSupport : distanceField), layout.clear());
+        fnt.markup(text + (fnt.distanceField != Font.DistanceFieldType.MSDF ? emojiSupport : distanceField), layout.clear());
 
-//        Gdx.app.exit();
+        Gdx.app.exit();
     }
 
     @Override
     public void render() {
         ScreenUtils.clear(0.75f, 0.75f, 0.75f, 1f);
-//        ScreenUtils.clear(0.3f, 0.3f, 0.3f, 1f);
-//        layout.getLine(0).glyphs.set(0, font.markupGlyph('@', "[" + colorNames.get((int)(TimeUtils.timeSinceMillis(startTime) >>> 8) % colorNames.size) + "]"));
-        float x = 400, y = layout.getHeight() - fnt.descent * fnt.scaleY;
+        float x = Gdx.graphics.getBackBufferWidth() * 0.5f;
+        float y = (Gdx.graphics.getBackBufferHeight() + layout.getHeight()) * 0.5f - fnt.descent * fnt.scaleY;
+        viewport.apply();
         batch.begin();
+        batch.setProjectionMatrix(viewport.getCamera().combined);
         fnt.enableShader(batch);
         fnt.drawGlyphs(batch, layout, x, y, Align.center);
         batch.end();
@@ -181,6 +162,7 @@ YanoneKaffeesatz-standard.fnt has descent: -19
 
     @Override
     public void resize(int width, int height) {
+        viewport.update(width, height, true);
         fnt.resizeDistanceField(width, height);
     }
 }

@@ -2,6 +2,7 @@ package com.github.tommyettinger.textra;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.graphics.Color;
@@ -29,6 +30,7 @@ public class TinyTypingLabelTest extends ApplicationAdapter {
     TextButton  buttonRestart;
     TextButton  buttonRebuild;
     TextButton  buttonSkip;
+    int adj = 0;
 
     @Override
     public void create() {
@@ -120,23 +122,28 @@ public class TinyTypingLabelTest extends ApplicationAdapter {
         TypingConfig.DEFAULT_CLEAR_COLOR = Color.WHITE;
 
         // Create some global variables to handle style
-        TypingConfig.GLOBAL_VARS.put("ICE_WIND", "{FASTER}{GRADIENT=88ccff;eef8ff;-0.5;5}{SLOWER}{WIND=2;4;0.25;0.1}");
+        TypingConfig.GLOBAL_VARS.put("ICE_WIND", "{GRADIENT=88ccff;eef8ff;-0.5;5}{WIND=2;4;0.25;0.1}{JOLT=1;0.6;inf;0.1;;}");
     }
 
     public TypingLabel createTypingLabel() {
-        Font.FontFamily family = new Font.FontFamily(
-                new String[]{
-                        "Serif", "Sans", "Mono", "Medieval", "Future", "Humanist"
-                },
-                new Font[]{
-                        KnownFonts.getGentium().scaleTo(32, 35)/*.scale(1.15f, 1.15f)*/,
-                        KnownFonts.getOpenSans().scaleTo(23, 35)/*.scale(1.15f, 1.15f)*/.adjustLineHeight(0.9f),
-                        KnownFonts.getInconsolata().scaleTo(15, 35)/*.scale(1.15f, 1.15f)*/.adjustLineHeight(1.1f),
-                        KnownFonts.getKingthingsFoundation().scaleTo(35, 35)/*.scale(1.15f, 1.15f)*/,
-                        KnownFonts.getOxanium().scaleTo(32, 35)/*.scale(1.15f, 1.15f)*/.adjustLineHeight(1.05f),
-                        KnownFonts.getYanoneKaffeesatz().scaleTo(32, 35)/*.scale(1.15f, 1.15f)*/.adjustLineHeight(0.85f)
-                });
-        Font font = family.connected[0].setFamily(family);
+//        Font.FontFamily family = new Font.FontFamily(
+//                new String[]{
+//                        "Serif", "Sans", "Mono", "Medieval", "Future", "Humanist"
+//                },
+//                new Font[]{
+//                        KnownFonts.getGentium().scaleTo(32, 35)/*.scale(1.15f, 1.15f)*/,
+//                        KnownFonts.getOpenSans().scaleTo(23, 35)/*.scale(1.15f, 1.15f)*/.adjustLineHeight(0.9f),
+//                        KnownFonts.getInconsolata().scaleTo(15, 35)/*.scale(1.15f, 1.15f)*/.adjustLineHeight(1.1f),
+//                        KnownFonts.getKingthingsFoundation().scaleTo(35, 35)/*.scale(1.15f, 1.15f)*/,
+//                        KnownFonts.getOxanium().scaleTo(32, 35)/*.scale(1.15f, 1.15f)*/.adjustLineHeight(1.05f),
+//                        KnownFonts.getYanoneKaffeesatz().scaleTo(32, 35)/*.scale(1.15f, 1.15f)*/.adjustLineHeight(0.85f)
+//                });
+//        Font font = family.connected[0].setFamily(family);
+        Font font = KnownFonts.getStandardFamily();
+        for(Font f : font.family.connected) {
+            if(f != null)
+                KnownFonts.addEmoji(f);
+        }
 
 //        Font font = new Font(KnownFonts.getOpenSans().scale(0.5f, 0.5f).setTextureFilter());
         // Create label
@@ -147,19 +154,30 @@ public class TinyTypingLabelTest extends ApplicationAdapter {
         // OK, it is definitely not something that requires different fonts to trigger. Specific widths cause line
         // wrapping to somehow break the ENDWIND token (or RESET).
         final TypingLabel label = new TypingLabel(
+//                "she's[red]{JOLT=1;0.6;inf;0.7;;} blowin' on down{RESET}, ",
 //                "Behold, the [/Terror{RESET}-[*]Bunny[*]!",
 //                "{SHAKE=1,1,2}[@Medieval]Behold{RESET}, the [/]Terror{RESET}-{GRADIENT=WHITE;RED}Bunny!",
 //                "{BLINK=ff0000ff;00ff27ff;1.0;0.5}redtogreen", // used to check unclosed effects with incomplete parameters
 //                "A {Bunny!", // used to check unclosed curly braces
 
 //                "[#8fc60cff][@OpenSans][%75]{spin}Lorem ipsum dolor sit amet, consectetur adipiscing elit.[]",
+//"Serif", "Sans", "Mono", "Condensed", "Humanist",
+//                        "Retro", "Slab", "Handwriting", "Canada", "Cozette", "Iosevka",
+//                        "Medieval", "Future", "Console", "Code"
 
-                "{JOLT=1;1.2;inf;0.3;dull lavender;light butter}There's a [/][@Medieval]STORM{RESET} on [@Future]the way[@], " +
-                "she's{WIND=3;2;0.2;0.2} blowin' on down{RESET}, " +
-                "whippin' her way through the [*]{FONT=Sans}whole dang[@][*] town! " +
-                "Sure as [/]I reckon[], if we [@Mono]meet our {HANG}fate{RESET}, " +
-                "this [light grey black][%150]storm[] will be there on clouds{SPIN=2;1;false}[%75] one{CLEARSIZE}{ENDSPIN} through {SPIN=1;8;false}[%200]eight[%]{ENDSPIN}!\n" +
-                "{SCALE=60.0}Uh-[_]huh[_].{ENDSCALE}{SCALE=120.0} All [~]right[~].{ENDSCALE}",
+                "{JOLT=1;1.2;inf;0.3;dull lavender;light butter}There's a [/][@Medieval]STORM{RESET} on [@Future][red]the way[][], " +
+//                "{OCEAN=0.7;1.25;0.11;1.0;0.65}There's a [/][@Medieval]STORM{RESET} on [@Future]the way[@], " +
+//                "she's{WIND=3;2;0.2;0.2} blowin' on down{RESET}, " +
+                "she's{VAR=SHIVERINGBLIZZARD} blowin' on down{RESET}, " +
+                "[@Handwriting]whippin'[] her [@Slab]way[] through the [*]{FONT=Sans}whole dang[][] town! " +
+                "[@Iosevka]Sure[@] as [/]I reckon[ ], if we [@Mono]meet our [@Cozette]{HANG}fate[@]{RESET}, " +
+                "this [light grey black][%125]storm[ ] will be [@Canada]there[@] on clouds{SPIN=2;1;false}[%75] one{CLEARSIZE}{ENDSPIN} through {SPIN=1;8;false}[%150]eight[%]{ENDSPIN}! " +
+//                "Should a young 'un go out, in the wind and the thunder, " +
+//                "if they make it back, it will be a [%^]true wonder[%]!",
+                "Should a [@Retro]young[@] {IF=gender;m=lad;f=lass;t='un;e=[+🧒]} go [@Code]out[@], in the [@Humanist]wind[@] and [@Geometric]the {SHAKE=;;2}thunder{ENDSHAKE}[@], " +
+                "if {IF=gender;m=he makes;f=she makes;t=they make;e=[+🧒] makes} it [@Condensed]back[@], it [@Console]will[@] be a [;][%^]true wonder[%][;]!",
+//                "Should a young {VAR=lad} go out, in the wind and the thunder, " +
+//                "if {VAR=he makes} it back, it will be a [%^]true wonder[%]!",
 
 //                "{JOLT=1;1.2;inf;0.3;9944aa;fff0cc}There's a [/]STORM[/]{ENDJOLT} on the way, " +
 //                "she's {WIND=3;2;0.2;0.2}blowin' on down{ENDWIND}, " +
@@ -178,7 +196,7 @@ public class TinyTypingLabelTest extends ApplicationAdapter {
                 font);
 //        final TypingLabel label = new TypingLabel("WELCOME [/]TO THE [*][GREEN]JUNGLE[]!", skin);
 //        final TypingLabel label = new TypingLabel("{WAIT=1}{SLOWER}Welcome, {VAR=title}!", skin);
-        label.setDefaultToken("{EASE}{FADE=0;1;0.33}");
+        label.setDefaultToken("{EASE}{FADE=0;1;0.33}{SLOW}");
         label.align = Align.topLeft;
 
         // Make the label wrap to new lines, respecting the table's layout.
@@ -186,8 +204,10 @@ public class TinyTypingLabelTest extends ApplicationAdapter {
         label.layout.maxLines = 15;
 //        label.layout.setTargetWidth(Gdx.graphics.getBackBufferWidth() - 100);
 
-        // Set variable replacements for the {VAR} token
-        label.setVariable("title", "curious human");
+        // Set variable replacements for the {VAR} and {IF} tokens
+        label.setVariable("gender", "f");
+        label.setVariable("lad", "'un");
+        label.setVariable("he makes", "they make");
 
         // Set an event listener for when the {EVENT} token is reached and for the char progression ends.
         label.setTypingListener(new TypingAdapter() {
@@ -217,8 +237,20 @@ public class TinyTypingLabelTest extends ApplicationAdapter {
         update(Gdx.graphics.getDeltaTime());
 
         ScreenUtils.clear(0.1f, 0.1f, 0.1f, 1);
-        
-
+        if(Gdx.input.isKeyJustPressed(Input.Keys.LEFT))
+        {
+            adj = adj + 15 & 15;
+            System.out.println("Adjusting " + label.font.family.connected[adj].name);
+        }
+        else if(Gdx.input.isKeyJustPressed(Input.Keys.RIGHT))
+        {
+            adj = adj + 1 & 15;
+            System.out.println("Adjusting " + label.font.family.connected[adj].name);
+        }
+        if(Gdx.input.isKeyJustPressed(Input.Keys.UP))
+            System.out.println(label.font.family.connected[adj].setDescent(label.font.family.connected[adj].descent + 1).descent + " " + label.font.family.connected[adj].name);
+        else if(Gdx.input.isKeyJustPressed(Input.Keys.DOWN))
+            System.out.println(label.font.family.connected[adj].setDescent(label.font.family.connected[adj].descent - 1).descent + " " + label.font.family.connected[adj].name);
         stage.draw();
         Gdx.graphics.setTitle(Gdx.graphics.getFramesPerSecond() + " FPS");
     }

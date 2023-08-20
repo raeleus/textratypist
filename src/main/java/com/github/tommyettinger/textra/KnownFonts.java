@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 See AUTHORS file.
+ * Copyright (c) 2022-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,15 +19,7 @@ package com.github.tommyettinger.textra;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.LifecycleListener;
 import com.badlogic.gdx.files.FileHandle;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
-import com.badlogic.gdx.utils.*;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.util.Comparator;
 
 import static com.github.tommyettinger.textra.Font.DistanceFieldType.*;
 
@@ -49,15 +41,20 @@ import static com.github.tommyettinger.textra.Font.DistanceFieldType.*;
  * files to use a Font. The required files include any license you need to abide by; this doesn't necessarily belong in
  * the {@code assets} folder like the rest of the files! Most of these fonts are either licensed under the OFL
  * or some Creative Commons license; the CC ones typically require attribution, but none of the fonts restrict usage to
- * noncommercial projects, and all are free as in beer as well.
+ * noncommercial projects, and all are free as in beer as well. Please take care to attribute the authors of fonts you
+ * use! Good fonts are not easy to make.
  * <br>
  * There are some special features in Font that are easier to use with parts of this class. {@link #getStandardFamily()}
  * pre-populates a FontFamily so you can switch between different fonts with the {@code [@Sans]} syntax.
  * {@link #addEmoji(Font)} adds all of Twitter's emoji from the <a href="https://github.com/twitter/twemoji">Twemoji</a>
  * project to a given font, which lets you enter emoji with the {@code [+man scientist, dark skin tone]} syntax or the
  * generally-easier {@code [+👨🏿‍🔬]} syntax. If you want to use names for emoji, you may want to consult "Twemoji.atlas"
- * for the exact names used; some names changed from the standard because of technical restrictions.
+ * for the exact names used; some names changed from the standard because of technical restrictions. You can also add
+ * the icons from <a href="https://game-icons.net">game-icons.net</a> using {@link #addGameIcons(Font)}. There is a
+ * <a href="https://tommyettinger.github.io/twemoji-atlas/">preview site for Twemoji, with names</a>, and another
+ * <a href="https://tommyettinger.github.io/game-icons-net-atlas/">preview site for the game icons</a>.
  */
+@SuppressWarnings("CallToPrintStackTrace")
 public final class KnownFonts implements LifecycleListener {
     private static KnownFonts instance;
 
@@ -95,18 +92,18 @@ public final class KnownFonts implements LifecycleListener {
      * available under a CC-BY-SA-3.0 license, which requires attribution to Damien Guard (and technically Tommy
      * Ettinger, because he made changes in a-starry) if you use it.
      * <br>
-     * Preview: <a href="https://i.imgur.com/Q3Tm7zi.png">Image link</a> (uses width=8, height=8)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/A%20Starry.png">Image link</a> (uses width=8, height=8)
      * <br>
      * This also looks good if you scale it so its height is twice its width. For small sizes, you should stick to
      * multiples of 8. This "A Starry Tall" version is present in {@link #getAll()} and {@link #getAllStandard()}.
      * <br>
-     * Preview: <a href="https://i.imgur.com/WWOz6Ej.png">Image link</a> (uses width=8, height=16)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/A%20Starry%20Tall.png">Image link</a> (uses width=8, height=16)
      * <br>
      * Needs files:
      * <ul>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-standard.fnt">AStarry-standard.fnt</a></li>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-standard.png">AStarry-standard.png</a></li>
-     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-license.txt">AStarry-license.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-License.txt">AStarry-License.txt</a></li>
      * </ul>
      *
      * @return the Font object that can represent many sizes of the font A Starry
@@ -116,8 +113,11 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.astarry == null) {
             try {
                 instance.astarry = new Font(instance.prefix + "AStarry-standard.fnt",
-                        instance.prefix + "AStarry-standard.png", STANDARD, 0, 16, 0, 0, true)
-                        .scaleTo(8, 8).setTextureFilter().setName("A Starry");
+                        instance.prefix + "AStarry-standard.png", STANDARD, 0, 12, 0, 0, true)
+                        .scaleTo(8, 8).setBoldStrength(0.5f)
+                        .setDescent(-12f)
+                        .setInlineImageMetrics(-4f, 20f, 0f)
+                        .setTextureFilter().setName("A Starry");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -141,13 +141,13 @@ public final class KnownFonts implements LifecycleListener {
      * If you only need sizes in small integer multiples of 8 pixels, you might get sharper-looking results from
      * {@link #getAStarry()}.
      * <br>
-     * Preview: <a href="https://i.imgur.com/NmSpNZI.png">Image link</a> (uses width=9, height=9)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/A%20Starry%20(MSDF).png">Image link</a> (uses width=10, height=10, crispness=2.0)
      * <br>
      * Needs files:
      * <ul>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-msdf.fnt">AStarry-msdf.fnt</a></li>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-msdf.png">AStarry-msdf.png</a></li>
-     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-license.txt">AStarry-license.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-License.txt">AStarry-License.txt</a></li>
      * </ul>
      *
      * @return the Font object that can represent many sizes of the font A Starry using MSDF
@@ -157,8 +157,10 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.astarryMSDF == null) {
             try {
                 instance.astarryMSDF = new Font(instance.prefix + "AStarry-msdf.fnt",
-                        instance.prefix + "AStarry-msdf.png", MSDF, 0, -12, 0, 0, false)
-                        .scaleTo(9, 9).setCrispness(2.5f).setName("A Starry (MSDF)");
+                        instance.prefix + "AStarry-msdf.png", MSDF, 0, 0, 0, 0, true)
+                        .setUnderlinePosition(0f, -0.2f).setStrikethroughPosition(0f, -0.2f)
+                        .setFancyLinePosition(0, -0.125f).setBoldStrength(0.5f)
+                        .scaleTo(10, 10).setCrispness(2f).setName("A Starry (MSDF)");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -179,12 +181,9 @@ public final class KnownFonts implements LifecycleListener {
      * or squashed so height is slightly smaller. Bitter looks very similar to {@link #getGentium()}, except that Bitter
      * is quite a bit lighter, with thinner strokes and stylistic flourishes on some glyphs.
      * This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
-     * This may work well in a font family with other fonts that do not use a distance field effect. Unlike most other
-     * fonts here, this does not use makeGridGlyphs, because it would make underline and strikethrough much thicker than
-     * other strokes in the font. This does mean that strikethrough starts too far to the left, and extends too far to
-     * the right, unfortunately, but its weight matches.
+     * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/VxOqDHm.png">Image link</a> (uses width=33, height=30)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Bitter.png">Image link</a> (uses width=33, height=30)
      * <br>
      * Needs files:
      * <ul>
@@ -200,7 +199,8 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.bitter == null) {
             try {
                 instance.bitter = new Font(instance.prefix + "Bitter-standard.fnt",
-                        instance.prefix + "Bitter-standard.png", STANDARD, 0, -48, 0, 0, true)
+                        instance.prefix + "Bitter-standard.png", STANDARD, 0, -20, 0, 0, true)
+                        .setInlineImageMetrics(0f, 20f, 0f).setLineMetrics(0, -0.0625f, 0f, -0.5f).setDescent(-16f)
                         .scaleTo(33, 30).setTextureFilter().setName("Bitter");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -223,7 +223,7 @@ public final class KnownFonts implements LifecycleListener {
      * This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/OYQO48z.png">Image link</a> (uses width=30, height=35)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Canada1500.png">Image link</a> (uses width=30, height=35)
      * <br>
      * Needs files:
      * <ul>
@@ -240,7 +240,9 @@ public final class KnownFonts implements LifecycleListener {
             try {
                 instance.canada = new Font(instance.prefix + "Canada1500-standard.fnt",
                         instance.prefix + "Canada1500-standard.png",
-                        STANDARD, 0, 0, 0, 0, true)
+                        STANDARD, 0, 8, 0, 0, true).setDescent(-13f)
+                        .setInlineImageMetrics(0f, 12f, 4f).setLineMetrics(0f, -0.125f, 0f, -0.25f)
+                        .setFancyLinePosition(0, 0.125f)
                         .scaleTo(30, 35).setTextureFilter().setName("Canada1500");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -262,13 +264,13 @@ public final class KnownFonts implements LifecycleListener {
      * This uses a fairly-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/dtnNvEF.png">Image link</a> (uses width=10, height=20)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Cascadia%20Mono.png">Image link</a> (uses width=10, height=20)
      * <br>
      * Needs files:
      * <ul>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/CascadiaMono-standard.fnt">CascadiaMono-standard.fnt</a></li>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/CascadiaMono-standard.png">CascadiaMono-standard.png</a></li>
-     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Cascadia-license.txt">Cascadia-license.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Cascadia-License.txt">Cascadia-License.txt</a></li>
      * </ul>
      *
      * @return the Font object that can represent many sizes of the font Cascadia Code Mono
@@ -278,7 +280,8 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.cascadiaMono == null) {
             try {
                 instance.cascadiaMono = new Font(instance.prefix + "CascadiaMono-standard.fnt",
-                        instance.prefix + "CascadiaMono-standard.png", STANDARD, 0f, 0f, 0f, 0f, true)
+                        instance.prefix + "CascadiaMono-standard.png", STANDARD, 0f, -4f, 0f, 0f, true)
+                        .setFancyLinePosition(0, 0.2f)
                         .setTextureFilter().scaleTo(10, 20).setName("Cascadia Mono");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -301,13 +304,13 @@ public final class KnownFonts implements LifecycleListener {
      * Field (MSDF) technique as opposed to the normal Signed Distance Field technique, which gives the rendered font
      * sharper edges and precise corners instead of rounded tips on strokes.
      * <br>
-     * Preview: <a href="https://i.imgur.com/PrqWyPN.png">Image link</a> (uses width=9, height=16)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Cascadia%20Mono%20(MSDF).png">Image link</a> (uses width=10, height=20)
      * <br>
      * Needs files:
      * <ul>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/CascadiaMono-msdf.fnt">CascadiaMono-msdf.fnt</a></li>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/CascadiaMono-msdf.png">CascadiaMono-msdf.png</a></li>
-     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Cascadia-license.txt">Cascadia-license.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Cascadia-License.txt">Cascadia-License.txt</a></li>
      * </ul>
      *
      * @return the Font object that can represent many sizes of the font Cascadia Code Mono using MSDF
@@ -317,8 +320,9 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.cascadiaMonoMSDF == null) {
             try {
                 instance.cascadiaMonoMSDF = new Font(instance.prefix + "CascadiaMono-msdf.fnt",
-                        instance.prefix + "CascadiaMono-msdf.png", MSDF, 0f, 0f, 0f, 0f, true)
-                        .scaleTo(9, 16).setName("Cascadia Mono (MSDF)");
+                        instance.prefix + "CascadiaMono-msdf.png", MSDF, 0f, 0f, -4f, -4f, true)
+                        .setLineMetrics(0, -0.08f, 0f, -0.25f).setFancyLinePosition(0, 0.2f)
+                        .scaleTo(10, 20).setName("Cascadia Mono (MSDF)");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -339,7 +343,7 @@ public final class KnownFonts implements LifecycleListener {
      * This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/tmjXEca.png">Image link</a> (uses width=32, height=32)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Caveat.png">Image link</a> (uses width=32, height=32)
      * <br>
      * Needs files:
      * <ul>
@@ -356,7 +360,10 @@ public final class KnownFonts implements LifecycleListener {
             try {
                 instance.caveat = new Font(instance.prefix + "Caveat-standard.fnt",
                         instance.prefix + "Caveat-standard.png",
-                        STANDARD, 0, 16, 0, 0, true)
+                        STANDARD, -10, 25, 0, 0, true)
+                        .setDescent(-8f)
+                        .setLineMetrics(0f, -0.25f, 0.05f, -0.4f)
+                        .setInlineImageMetrics(0f, 44f, 0f)
                         .scaleTo(32, 32).setTextureFilter().setName("Caveat");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -373,30 +380,34 @@ public final class KnownFonts implements LifecycleListener {
      * Returns a Font configured to use a cozy fixed-width bitmap font,
      * <a href="https://github.com/slavfox/Cozette">Cozette by slavfox</a>. Cozette has broad coverage of Unicode,
      * including Greek, Cyrillic, Braille, and tech-related icons. This does not scale well except to integer
-     * multiples, but it should look very crisp at its default size of 7x13 pixels. This defaults to having
-     * {@link Font#integerPosition} set to true, which helps keep it pixel-perfect if 1 world unit is 1 pixel, but can
-     * cause major visual issues if 1 world unit corresponds to much more than 1 pixel.
+     * multiples, but it should look very crisp at its default size of 6x17 pixels. This defaults to having
+     * {@link Font#integerPosition} set to true, which currently does nothing (the code that enforces integer positions
+     * seems to ruin the appearance of any font that uses it, so that code isn't ever used now).
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/3gWUZbJ.png">Image link</a> (uses width=7, height=13,
-     * useIntegerPositions(true); this size is small enough to make the scaled text unreadable in some places)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Cozette.png">Image link</a> (uses width=6, height=17; this size is small
+     * enough to make the scaled text unreadable in some places)
      * <br>
      * Needs files:
      * <ul>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Cozette-standard.fnt">Cozette-standard.fnt</a></li>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Cozette-standard.png">Cozette-standard.png</a></li>
-     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Cozette-license.txt">Cozette-license.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Cozette-License.txt">Cozette-License.txt</a></li>
      * </ul>
      *
-     * @return the Font object that represents the 7x13px font Cozette
+     * @return the Font object that represents the 6x17px font Cozette
      */
     public static Font getCozette() {
         initialize();
         if (instance.cozette == null) {
             try {
                 instance.cozette = new Font(instance.prefix + "Cozette-standard.fnt",
-                        instance.prefix + "Cozette-standard.png", STANDARD, 0, 2, 0, 0, false)
+                        instance.prefix + "Cozette-standard.png", STANDARD, 1f, 5f, 0, 0, false)
                         .useIntegerPositions(true)
+                        .setDescent(-3f)
+                        .setUnderlinePosition(0f, -0.125f)
+                        .setStrikethroughPosition(0f, 0f)
+                        .setInlineImageMetrics(-32f, 4f, 8f)
                         .setName("Cozette");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -420,7 +431,7 @@ public final class KnownFonts implements LifecycleListener {
      * Field (MSDF) technique as opposed to the normal Signed Distance Field technique, which gives the rendered font
      * sharper edges and precise corners instead of rounded tips on strokes.
      * <br>
-     * Preview: <a href="https://i.imgur.com/tbVrdSP.png">Image link</a> (uses width=9, height=20)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/DejaVu%20Sans%20Mono%20(MSDF).png">Image link</a> (uses width=9, height=20, crispness=2.0)
      * <br>
      * Needs files:
      * <ul>
@@ -436,8 +447,10 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.dejaVuSansMono == null) {
             try {
                 instance.dejaVuSansMono = new Font(instance.prefix + "DejaVuSansMono-msdf.fnt",
-                        instance.prefix + "DejaVuSansMono-msdf.png", MSDF, 0f, -8f, 0f, 0f, true)
-                        .scaleTo(9, 20).setName("DejaVu Sans Mono (MSDF)");
+                        instance.prefix + "DejaVuSansMono-msdf.png", MSDF, 0f, 0f, 0f, 0f, true)
+                        .setDescent(-6f).scaleTo(9, 20)
+                        .setFancyLinePosition(0f, 0.25f)
+                        .setLineMetrics(0f, 0f, 0f, -0.25f).setCrispness(2f).setName("DejaVu Sans Mono (MSDF)");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -455,16 +468,18 @@ public final class KnownFonts implements LifecycleListener {
      * Gentium, an open-source (SIL Open Font License) typeface by SIL (see
      * <a href="https://software.sil.org/gentium/">SIL's page on Gentium here</a>). It supports a lot of glyphs,
      * including quite a bit of extended Latin, Greek, and Cyrillic, as well as some less-common glyphs from various
-     * real languages. This does not use a distance field effect, as opposed to {@link #getGentiumSDF()}. You may want
-     * to stick using just fonts that avoid distance fields if you have a family of fonts.
+     * real languages. This does not use a distance field effect, as opposed to {@link #getGentiumSDF()} or
+     * {@link #getGentiumMSDF()}. You may want to stick using just fonts that avoid distance fields if you have a family
+     * of fonts.
+     * You can also use {@link #getStandardFamily()} to obtain a variant on this Font that has a FontFamily already.
      * <br>
-     * Preview: <a href="https://i.imgur.com/qPKtj7L.png">Image link</a> (uses width=31, height=35)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Gentium.png">Image link</a> (uses width=31, height=35)
      * <br>
      * Needs files:
      * <ul>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-standard.fnt">Gentium-standard.fnt</a></li>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-standard.png">Gentium-standard.png</a></li>
-     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-license.txt">Gentium-license.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-License.txt">Gentium-License.txt</a></li>
      * </ul>
      *
      * @return the Font object that can represent many sizes of the font Gentium.ttf
@@ -474,8 +489,10 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.gentium == null) {
             try {
                 instance.gentium = new Font(instance.prefix + "Gentium-standard.fnt",
-                        instance.prefix + "Gentium-standard.png", Font.DistanceFieldType.STANDARD, 0f, 0f, 0f, 0f, true)
-                        .scaleTo(31, 35).setTextureFilter().setName("Gentium");
+                        instance.prefix + "Gentium-standard.png", Font.DistanceFieldType.STANDARD, 0f, 10f, 0f, 0f, true)
+                        .scaleTo(31, 35).setInlineImageMetrics(-4f, 32f, 8f).setLineMetrics(0f, -0.2f, 0f, -0.4f)
+                        .setDescent(-9f)
+                        .setTextureFilter().setName("Gentium");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -485,12 +502,54 @@ public final class KnownFonts implements LifecycleListener {
         throw new RuntimeException("Assets for getGentium() not found.");
     }
 
+    private Font gentiumMSDF;
+
+    /**
+     * Returns a Font already configured to use a variable-width serif font with excellent Unicode support, that should
+     * scale cleanly to even very large sizes (using an MSDF technique). You usually will want to reduce the line height
+     * of this Font after you scale it; using
+     * {@code KnownFonts.getGentiumMSDF().scaleTo(50, 45).adjustLineHeight(0.625f)}
+     * usually works. Caches the result for later calls. The font used is Gentium, an open-source (SIL Open Font
+     * License) typeface by SIL (see <a href="https://software.sil.org/gentium/">SIL's page on Gentium here</a>). It
+     * supports a lot of glyphs, including quite a
+     * bit of extended Latin, Greek, and Cyrillic, as well as some less-common glyphs from various real languages. This
+     * uses the Multi-channel Signed Distance Field (MSDF) technique as opposed to the normal Signed Distance Field
+     * technique, which gives the rendered font sharper edges and precise corners instead of rounded tips on strokes.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Gentium%20(MSDF).png">Image link</a> (uses width=50, height=45,
+     * adjustLineHeight(0.625f), setCrispness(3f))
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-msdf.fnt">Gentium-msdf.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-msdf.png">Gentium-msdf.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-License.txt">Gentium-License.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font Gentium.ttf using MSDF
+     */
+    public static Font getGentiumMSDF() {
+        initialize();
+        if (instance.gentiumMSDF == null) {
+            try {
+                instance.gentiumMSDF = new Font(instance.prefix + "Gentium-msdf.fnt",
+                        instance.prefix + "Gentium-msdf.png", MSDF, 0f, 0f, 0f, 0f, true)
+                        .scaleTo(50, 45).adjustLineHeight(0.625f).setCrispness(3f).setName("Gentium (MSDF)");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.gentiumMSDF != null)
+            return new Font(instance.gentiumMSDF);
+        throw new RuntimeException("Assets for getGentiumMSDF() not found.");
+    }
+
     private Font gentiumSDF;
 
     /**
      * Returns a Font already configured to use a variable-width serif font with excellent Unicode support, that should
      * scale cleanly to even very large sizes (using an SDF technique). You usually will want to reduce the line height
-     * of this Font after you scale it; using {@code KnownFonts.getGentium().scaleTo(55, 45).adjustLineHeight(0.8f)}
+     * of this Font after you scale it; using {@code KnownFonts.getGentiumSDF().scaleTo(50, 45).adjustLineHeight(0.625f)}
      * usually works. Caches the result for later calls. The font used is Gentium, an open-source (SIL Open Font
      * License) typeface by SIL (see <a href="https://software.sil.org/gentium/">SIL's page on Gentium here</a>). It
      * supports a lot of glyphs, including quite a
@@ -498,13 +557,14 @@ public final class KnownFonts implements LifecycleListener {
      * uses the Signed Distance Field (SDF) technique, which may be slightly fuzzy when zoomed in heavily, but should be
      * crisp enough when zoomed out.
      * <br>
-     * Preview: <a href="https://i.imgur.com/M0TKdbS.png">Image link</a> (uses width=50, height=45, adjustLineHeight(0.625f))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Gentium%20(SDF).png">Image link</a> (uses width=50, height=45,
+     * adjustLineHeight(0.625f), setCrispness(1.5f))
      * <br>
      * Needs files:
      * <ul>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-sdf.fnt">Gentium-sdf.fnt</a></li>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-sdf.png">Gentium-sdf.png</a></li>
-     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-license.txt">Gentium-license.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-License.txt">Gentium-License.txt</a></li>
      * </ul>
      *
      * @return the Font object that can represent many sizes of the font Gentium.ttf using SDF
@@ -514,8 +574,10 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.gentiumSDF == null) {
             try {
                 instance.gentiumSDF = new Font(instance.prefix + "Gentium-sdf.fnt",
-                        instance.prefix + "Gentium-sdf.png", SDF, 4f, -20f, 0f, 0f, true)
-                        .scaleTo(50, 45).adjustLineHeight(0.625f).setCrispness(1.5f).setName("Gentium (SDF)");
+                        instance.prefix + "Gentium-sdf.png", SDF, 4f, -45f, 0f, 0f, true)
+                        .scaleTo(50, 45).adjustLineHeight(0.625f).setFancyLinePosition(0f, 1.1f)
+                        .setLineMetrics(0.05f, 1f, 0f, -0.5f).setInlineImageMetrics(0f, -42f, 8f)
+                        .setCrispness(1.5f).setName("Gentium (SDF)");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -524,18 +586,164 @@ public final class KnownFonts implements LifecycleListener {
             return new Font(instance.gentiumSDF);
         throw new RuntimeException("Assets for getGentiumSDF() not found.");
     }
+    private Font gentiumUnItalic;
+
+    /**
+     * Returns a Font already configured to use a variable-width "italic-like" serif font with excellent Unicode
+     * support, that should scale well from a height of about 97 down to a height of 30.
+     * Caches the result for later calls. The font used is Gentium, an open-source (SIL Open Font License) typeface by
+     * SIL (see <a href="https://software.sil.org/gentium/">SIL's page on Gentium here</a>), but this took Gentium
+     * Italic and removed the 8-degree slant it had, so it looks like a regular face but with the different serif style
+     * and the "flow" of an italic font. This helps it look closer to carefully-hand-written text mixed with a serif
+     * typeface, and may fit well as a main-text font for medieval or Renaissance-period games while something like
+     * {@link #getKingthingsFoundation()} is used for titles or headers. It supports a lot of glyphs, including quite a
+     * bit of extended Latin, Greek, and Cyrillic, as well as some less-common glyphs from various real languages. Even
+     * though glyphs are not especially wide here, this Font does need to be configured with a much larger width than
+     * height to be readable. This does not use a distance field effect. You may want to stick using just fonts that
+     * avoid distance fields if you have a family of fonts.
+     * <br>
+     * Thanks to Siavash Ranbar, who came up with the idea to take an italic version of a serif font and remove its
+     * slant, keeping the different flow from a simple oblique font.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Gentium%20Un-Italic.png">Image link</a> (uses width=60, height=36)
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/GentiumUnItalic-standard.fnt">GentiumUnItalic-standard.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/GentiumUnItalic-standard.png">GentiumUnItalic-standard.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Gentium-License.txt">Gentium-License.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font Gentium-Un-Italic.ttf
+     */
+    public static Font getGentiumUnItalic() {
+        initialize();
+        if (instance.gentiumUnItalic == null) {
+            try {
+                instance.gentiumUnItalic = new Font(instance.prefix + "GentiumUnItalic-standard.fnt",
+                        instance.prefix + "GentiumUnItalic-standard.png", Font.DistanceFieldType.STANDARD, 0f, 4f, 0f, -12f, true)
+                        .scaleTo(60, 36).setTextureFilter().setFancyLinePosition(0, 0.375f).setDescent(-32f)
+                        .setLineMetrics(0f, 0.15f, 0f, -0.3125f).setInlineImageMetrics(0f, -24f, 8f)
+                        .setName("Gentium Un-Italic");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.gentiumUnItalic != null)
+            return new Font(instance.gentiumUnItalic);
+        throw new RuntimeException("Assets for getGentiumUnItalic() not found.");
+    }
+
+    private Font goNotoUniversal;
+
+    /**
+     * Returns a Font already configured to use a variable-width sans-serif font with extreme pan-Unicode support, that
+     * should scale cleanly to medium-small sizes (but not large sizes). Caches the result for later calls. The
+     * font used is Go Noto Universal, an open-source (SIL Open Font License) typeface that modifies Noto Sans by Google
+     * (see <a href="https://github.com/satbyy/go-noto-universal">Go Noto Universal's page is here</a>, and
+     * <a href="https://notofonts.github.io/">Noto Fonts have a page here</a>). It supports... most glyphs, from many
+     * languages, including essentially all extended Latin, Greek, Cyrillic, Chinese, Japanese, Armenian, Ethiopic,
+     * Cherokee, Javanese... Most scripts are here, though not Hangul (used for Korean). This also has symbols for math,
+     * music, and other usage. Unlike {@link #getGoNotoUniversalSDF() the SDF version}, the standard version should have
+     * a stable baseline. The texture this uses is larger than many of the others here, at 4096x4096 pixels, but the
+     * file isn't too large; in fact, the 2048x2048 textures Gentium-msdf.png and Twemoji.png are each larger than
+     * GoNotoUniversal-standard.png . The .fnt has 21274 glyphs plus extensive kerning info, though, so it is large.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Go%20Noto%20Universal.png">Image link</a> (uses width=66, height=33)
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/GoNotoUniversal-standard.fnt">GoNotoUniversal-standard.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/GoNotoUniversal-standard.png">GoNotoUniversal-standard.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/GoNotoUniversal-License.txt">GoNotoUniversal-License.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font GoNotoCurrent.ttf using SDF
+     */
+    public static Font getGoNotoUniversal() {
+        initialize();
+        if (instance.goNotoUniversal == null) {
+            try {
+                instance.goNotoUniversal = new Font(instance.prefix + "GoNotoUniversal-standard.fnt",
+                        instance.prefix + "GoNotoUniversal-standard.png", STANDARD, 0f, 0f, 0f, 0f, true)
+                        .scaleTo(66, 33).setFancyLinePosition(0, 0.4f)
+                        .setLineMetrics(0f, 0.1875f, 0f, -0.375f).setInlineImageMetrics(0f, -4f, 6f)
+                        .setTextureFilter().setName("Go Noto Universal");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.goNotoUniversal != null)
+            return new Font(instance.goNotoUniversal);
+        throw new RuntimeException("Assets for getGoNotoUniversal() not found.");
+    }
+
+    private Font goNotoUniversalSDF;
+
+    /**
+     * Returns a Font already configured to use a variable-width sans-serif font with extreme pan-Unicode support, that
+     * should scale cleanly to even very large sizes (using an SDF technique). Caches the result for later calls. The
+     * font used is Go Noto Universal, an open-source (SIL Open Font License) typeface that modifies Noto Sans by Google
+     * (see <a href="https://github.com/satbyy/go-noto-universal">Go Noto Universal's page is here</a>, and
+     * <a href="https://notofonts.github.io/">Noto Fonts have a page here</a>). It supports... most glyphs, from many
+     * languages, including essentially all extended Latin, Greek, Cyrillic, Chinese, Japanese, Armenian, Ethiopic,
+     * Cherokee, Javanese... Most scripts are here, though not Hangul (used for Korean). This also has symbols for math,
+     * music, and other usage. The baseline may be slightly uneven at larger sizes, but should even out when height is
+     * less than 40 or so. This uses the Signed Distance Field (SDF) technique, which may be slightly fuzzy when zoomed
+     * in heavily, but should be crisp enough when zoomed out. The texture this uses is larger than many of the others
+     * here, at 4096x4096 pixels, but the file isn't too large; in fact, the 2048x2048 textures Gentium-msdf.png and
+     * Twemoji.png are each larger than GoNotoUniversal-sdf.png . The .fnt has 24350 glyphs plus extensive kerning info,
+     * though, so it is quite large.
+     * <br>
+     * A quirk of this particular .fnt file is that it uses features specific to TextraTypist; as far as I know, it
+     * cannot be read by the libGDX BitmapFont class. These features are simply how it stores metric values -- as float,
+     * rather than only as int. You should probably not try to load GoNotoUniversal-sdf.fnt with BitmapFont or
+     * DistanceFieldFont in libGDX. Using floats is very helpful for the distance field effect; without them, most
+     * glyphs would render slightly off from the intended position, due to rounding to an int instead of using a float.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Go%20Noto%20Universal%20(SDF).png">Image link</a> (uses width=43.25, height=34,
+     * setCrispness(1.8f))
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/GoNotoUniversal-sdf.fnt">GoNotoUniversal-sdf.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/GoNotoUniversal-sdf.png">GoNotoUniversal-sdf.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/GoNotoUniversal-License.txt">GoNotoUniversal-License.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font GoNotoCurrent.ttf using SDF
+     */
+    public static Font getGoNotoUniversalSDF() {
+        initialize();
+        if (instance.goNotoUniversalSDF == null) {
+            try {
+                instance.goNotoUniversalSDF = new Font(instance.prefix + "GoNotoUniversal-sdf.fnt",
+                        instance.prefix + "GoNotoUniversal-sdf.png", SDF, 0f, -16f, 0f, 0f, true)
+                        .scaleTo(43.25f, 34).adjustLineHeight(0.625f)
+                        .setCrispness(1.8f).setFancyLinePosition(0f, 1.15f)
+                        .setLineMetrics(0.25f, 0.85f, 0.2f, -0.5f).setInlineImageMetrics(0f, -28f, 16f)
+                        .setName("Go Noto Universal (SDF)");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.goNotoUniversalSDF != null)
+            return new Font(instance.goNotoUniversalSDF);
+        throw new RuntimeException("Assets for getGoNotoUniversalSDF() not found.");
+    }
 
     private Font hanazono;
 
     /**
      * Returns a Font already configured to use a variable-width, narrow font with nearly-complete CJK character
-     * coverage, plus Latin, Greek, and Cyrillic, that shouldm scale pretty well down, but not up.
+     * coverage, plus Latin, Greek, and Cyrillic, that should scale pretty well down, but not up.
      * Caches the result for later calls. The font used is Hanazono (HanMinA, specifically), a free (OFL) typeface.
      * This uses a somewhat-small standard bitmap font because of how many glyphs are present (over 34000); it might not
-     * scale as well as other standard bitmap fonts here.
-     * This may work well in a font family with other fonts that do not use a distance field effect.
+     * scale as well as other standard bitmap fonts here. You may want to consider {@link #getGoNotoUniversalSDF()} if
+     * you can use an SDF font, since it scales up with higher quality.
+     * Otherwise, this may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/I5R4Qqb.png">Image link</a> (uses width=16, height=20)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Hanazono.png">Image link</a> (uses width=16, height=20)
      * <br>
      * Needs files:
      * <ul>
@@ -551,7 +759,9 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.hanazono == null) {
             try {
                 instance.hanazono = new Font(instance.prefix + "Hanazono-standard.fnt",
-                        instance.prefix + "Hanazono-standard.png", STANDARD, 0, 0, 0, 0, false).scaleTo(16, 20)
+                        instance.prefix + "Hanazono-standard.png", STANDARD, -4, 0, 0, 0, true)
+                        .setDescent(-6f).scaleTo(16, 20).setFancyLinePosition(-0.5f, 0.125f)
+                        .setLineMetrics(-0.25f, 0f, 0f, -0.5f).setInlineImageMetrics(-16f, -4f, 0f)
                         .setTextureFilter().setName("Hanazono");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -570,7 +780,9 @@ public final class KnownFonts implements LifecycleListener {
      * from a SadConsole format file, which shouldn't affect how it looks (but in reality,
      * it might). This does not scale except to integer multiples, but it should look very
      * crisp at its default size of 8x16 pixels. This supports some extra characters, but
-     * not at the typical Unicode codepoints.
+     * not at the typical Unicode codepoints. This defaults to having
+     * {@link Font#integerPosition} set to true, which currently does nothing (the code that enforces integer positions
+     * seems to ruin the appearance of any font that uses it, so that code isn't ever used now).
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
      * This does not include a license because the source, <a href="https://github.com/Thraka/SadConsole/tree/master/Fonts">SadConsole's fonts</a>,
@@ -579,7 +791,8 @@ public final class KnownFonts implements LifecycleListener {
      * can use {@link #getCozette()} or {@link #getQuanPixel()} for a different bitmap font. There
      * is also {@link #getAStarry()} for a non-pixel font styled after a font from the same era.
      * <br>
-     * Preview: <a href="https://i.imgur.com/o1BN44s.png">Image link</a> (uses width=8, height=16)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/IBM%208x16.png">Image link</a> (uses width=8, height=16, done with
+     * fitCell(8, 16, false))
      * <br>
      * Needs files:
      * <ul>
@@ -594,7 +807,8 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.ibm8x16 == null) {
             try {
                 instance.ibm8x16 = new Font(instance.prefix, "IBM-8x16-standard.font", true)
-                        .fitCell(8, 16, false).setName("IBM 8x16");
+                        .setBoldStrength(0.5f).setLineMetrics(-0.25f, 0f, 0f, 0f)
+                        .setInlineImageMetrics(-40, 0, 0).fitCell(8, 16, false).setName("IBM 8x16").setDescent(-3f);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -613,7 +827,7 @@ public final class KnownFonts implements LifecycleListener {
      * use a distance field effect, as opposed to {@link #getInconsolataMSDF()}.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/NdEFl7J.png">Image link</a> (uses width=10, height=26)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Inconsolata%20LGC.png">Image link</a> (uses width=10, height=26)
      * <br>
      * Needs files:
      * <ul>
@@ -629,7 +843,9 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.inconsolata == null) {
             try {
                 instance.inconsolata = new Font(instance.prefix + "Inconsolata-LGC-Custom-standard.fnt",
-                        instance.prefix + "Inconsolata-LGC-Custom-standard.png", STANDARD, 0f, 6f, -4f, 0f, true)
+                        instance.prefix + "Inconsolata-LGC-Custom-standard.png", STANDARD, 1f, 6f, -4f, 0f, true)
+                        .setFancyLinePosition(0f, 0.2f)
+                        .setLineMetrics(0f, 0f, 0f, -0.4f).setInlineImageMetrics(0f, 8f, 0f).setDescent(-21f)
                         .scaleTo(10, 26).setTextureFilter().setName("Inconsolata LGC");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -649,7 +865,7 @@ public final class KnownFonts implements LifecycleListener {
      * Multi-channel Signed Distance Field (MSDF) technique as opposed to the normal Signed Distance Field technique,
      * which gives the rendered font sharper edges and precise corners instead of rounded tips on strokes.
      * <br>
-     * Preview: <a href="https://i.imgur.com/II4Vgq2.png">Image link</a> (uses width=10, height=26)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Inconsolata%20LGC%20(MSDF).png">Image link</a> (uses .scaleTo(12, 26).setCrispness(1.2f))
      * <br>
      * Needs files:
      * <ul>
@@ -665,8 +881,9 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.inconsolataMSDF == null) {
             try {
                 instance.inconsolataMSDF = new Font(instance.prefix + "Inconsolata-LGC-Custom-msdf.fnt",
-                        instance.prefix + "Inconsolata-LGC-Custom-msdf.png", MSDF, 0f, -5f, -12f, 0f, true)
-                        .scaleTo(10, 26).setName("Inconsolata LGC (MSDF)");
+                        instance.prefix + "Inconsolata-LGC-Custom-msdf.png", MSDF, 1f, 1f, -8f, -8f, true)
+                        .setFancyLinePosition(0f, 0.25f)
+                        .scaleTo(12, 26).setCrispness(1.2f).setName("Inconsolata LGC (MSDF)");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -689,7 +906,7 @@ public final class KnownFonts implements LifecycleListener {
      * have an unknown effect; you may want to stick to scaling this and not re-fitting if you encounter issues.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/OCkVPgG.png">Image link</a> (uses .scaleTo(10, 24).fitCell(10, 24, false))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Iosevka.png">Image link</a> (uses .scaleTo(10, 24).fitCell(10, 24, false))
      * <br>
      * Needs files:
      * <ul>
@@ -706,7 +923,9 @@ public final class KnownFonts implements LifecycleListener {
             try {
                 instance.iosevka = new Font(instance.prefix + "Iosevka-standard.fnt",
                         instance.prefix + "Iosevka-standard.png", STANDARD, -2f, 12f, 0f, 0f, true)
-                        .scaleTo(10, 24).fitCell(10, 24, false).setTextureFilter().setName("Iosevka");
+                        .scaleTo(10, 24).fitCell(10, 24, false)
+                        .setDescent(-10f).setLineMetrics(-0.125f, -0.125f, 0f, -0.25f).setInlineImageMetrics(-6f, 12f, 0f)
+                        .setTextureFilter().setName("Iosevka");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -732,7 +951,8 @@ public final class KnownFonts implements LifecycleListener {
      * However, using a distance field makes it effectively impossible to mix fonts using a FontFamily (any variation in
      * distance field settings would make some fonts in the family blurry and others too sharp).
      * <br>
-     * Preview: <a href="https://i.imgur.com/pp1Wt1W.png">Image link</a> (uses .scaleTo(12, 26).fitCell(10, 25, false))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Iosevka%20(MSDF).png">Image link</a> (uses
+     * .setCrispness(2.5f).scaleTo(12, 26).fitCell(10, 25, false))
      * <br>
      * Needs files:
      * <ul>
@@ -750,8 +970,9 @@ public final class KnownFonts implements LifecycleListener {
                 // NOTE: If the .fnt file is changed, the manual adjustment to '_' (id=95) will be lost. yoffset was changed to 4.
                 // This should be OK now that this uses the box-drawing underline.
                 instance.iosevkaMSDF = new Font(instance.prefix + "Iosevka-msdf.fnt",
-                        instance.prefix + "Iosevka-msdf.png", MSDF, 0f, -15f, 0f, 0f, true)
-                        .setCrispness(0.75f).scaleTo(12, 26).fitCell(10, 25, false)
+                        instance.prefix + "Iosevka-msdf.png", MSDF, 1f, 0f, 0f, 0f, true).setDescent(-12)
+                        .setLineMetrics(0.25f, 0.125f, 0f, -0.4f).setFancyLinePosition(0f, 0.375f)
+                        .setCrispness(2.5f).scaleTo(12, 26).fitCell(10, 25, false)
                         .setName("Iosevka (MSDF)");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -778,7 +999,8 @@ public final class KnownFonts implements LifecycleListener {
      * at small sizes. However, using a distance field makes it effectively impossible to mix fonts using a FontFamily
      * (any variation in distance field settings would make some fonts in the family blurry and others too sharp).
      * <br>
-     * Preview: <a href="https://i.imgur.com/tNRyiV0.png">Image link</a> (uses .scaleTo(12, 26).fitCell(10, 25, false))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Iosevka%20(SDF).png">Image link</a> (uses
+     * .setCrispness(0.75f).scaleTo(12, 26).fitCell(10, 25, false))
      * <br>
      * Needs files:
      * <ul>
@@ -796,7 +1018,8 @@ public final class KnownFonts implements LifecycleListener {
                 // NOTE: If the .fnt file is changed, the manual adjustment to '_' (id=95) will be lost. yoffset was changed to 4.
                 // This should be OK now that this uses the box-drawing underline.
                 instance.iosevkaSDF = new Font(instance.prefix + "Iosevka-sdf.fnt",
-                        instance.prefix + "Iosevka-sdf.png", SDF, 2f, -18f, -2f, 0f, true)
+                        instance.prefix + "Iosevka-sdf.png", SDF, 2f, 0f, -2f, -2f, true)
+                        .setLineMetrics(0.25f, -0.125f, 0f, -0.4f).setInlineImageMetrics(8f, 12f, 12f)
                         .setCrispness(0.75f).scaleTo(12, 26).fitCell(10, 25, false)
                         .setName("Iosevka (SDF)");
             } catch (Exception e) {
@@ -821,7 +1044,7 @@ public final class KnownFonts implements LifecycleListener {
      * have an unknown effect; you may want to stick to scaling this and not re-fitting if you encounter issues.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/RNNncoM.png">Image link</a> (uses .scaleTo(10, 24).fitCell(10, 24, false))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Iosevka%20Slab.png">Image link</a> (uses .scaleTo(10, 24).fitCell(10, 24, false))
      * <br>
      * Needs files:
      * <ul>
@@ -838,7 +1061,9 @@ public final class KnownFonts implements LifecycleListener {
             try {
                 instance.iosevkaSlab = new Font(instance.prefix + "Iosevka-Slab-standard.fnt",
                         instance.prefix + "Iosevka-Slab-standard.png", STANDARD, 0f, 12f, 0f, 0f, true)
-                        .scaleTo(10, 24).fitCell(10, 24, false).setTextureFilter().setName("Iosevka Slab");
+                        .scaleTo(10, 24).fitCell(10, 24, false)
+                        .setDescent(-10f).setLineMetrics(-0.125f, -0.125f, 0f, -0.25f).setInlineImageMetrics(-6f, 12f, 0f)
+                        .setTextureFilter().setName("Iosevka Slab");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -862,7 +1087,8 @@ public final class KnownFonts implements LifecycleListener {
      * This uses the Multi-channel Signed Distance Field (MSDF) technique as opposed to the normal Signed Distance Field
      * technique, which gives the rendered font sharper edges and precise corners instead of rounded tips on strokes.
      * <br>
-     * Preview: <a href="https://i.imgur.com/j1pO4iD.png">Image link</a> (uses .scaleTo(12, 26).fitCell(10, 25, false))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Iosevka%20Slab%20(MSDF).png">Image link</a> (uses
+     * .setCrispness(2.5f).scaleTo(12, 26).fitCell(10, 25, false))
      * <br>
      * Needs files:
      * <ul>
@@ -877,11 +1103,10 @@ public final class KnownFonts implements LifecycleListener {
         initialize();
         if (instance.iosevkaSlabMSDF == null) {
             try {
-                // NOTE: If the .fnt file is changed, the manual adjustment to '_' (id=95) will be lost. yoffset was changed to 4.
-                // This might be OK now that this uses the box-drawing underline.
                 instance.iosevkaSlabMSDF = new Font(instance.prefix + "Iosevka-Slab-msdf.fnt",
-                        instance.prefix + "Iosevka-Slab-msdf.png", MSDF, 0f, -15f, 0f, 0f, true)
-                        .setCrispness(0.75f).scaleTo(12, 26).fitCell(10, 25, false)
+                        instance.prefix + "Iosevka-Slab-msdf.png", MSDF, 1f, 0f, 0f, 0f, true).setDescent(-12)
+                        .setLineMetrics(0.25f, 0.125f, 0f, -0.4f).setFancyLinePosition(0f, 0.375f)
+                        .setCrispness(2.5f).scaleTo(12, 26).fitCell(10, 25, false)
                         .setName("Iosevka Slab (MSDF)");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -907,7 +1132,8 @@ public final class KnownFonts implements LifecycleListener {
      * technique that {@link #getIosevkaSlabMSDF()} uses, which isn't as sharp at large sizes but can look a little
      * better at small sizes.
      * <br>
-     * Preview: <a href="https://i.imgur.com/47Vo4uE.png">Image link</a> (uses scaleTo(12, 26).fitCell(10, 25, false))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Iosevka%20Slab%20(SDF).png">Image link</a> (uses
+     * .setCrispness(0.75f).scaleTo(12, 26).fitCell(10, 25, false))
      * <br>
      * Needs files:
      * <ul>
@@ -925,7 +1151,8 @@ public final class KnownFonts implements LifecycleListener {
                 // NOTE: If the .fnt file is changed, the manual adjustment to '_' (id=95) will be lost. yoffset was changed to 4.
                 // This might be OK now that this uses the box-drawing underline.
                 instance.iosevkaSlabSDF = new Font(instance.prefix + "Iosevka-Slab-sdf.fnt",
-                        instance.prefix + "Iosevka-Slab-sdf.png", SDF, 2f, -18f, -2f, 0f, true)
+                        instance.prefix + "Iosevka-Slab-sdf.png", SDF, 2f, 0f, -2f, -2f, true)
+                        .setLineMetrics(0.25f, -0.125f, 0f, -0.4f).setInlineImageMetrics(8f, 12f, 12f)
                         .setCrispness(0.75f).scaleTo(12, 26).fitCell(10, 25, false)
                         .setName("Iosevka Slab (SDF)");
             } catch (Exception e) {
@@ -944,11 +1171,13 @@ public final class KnownFonts implements LifecycleListener {
      * scale pretty well from a height of about 90 down to a height of maybe 30.
      * Caches the result for later calls. The font used is Kingthings Foundation, a free (custom permissive license)
      * typeface; this has faux-bold applied already in order to make some ornamental curls visible at more sizes. You
-     * can still apply bold again using markup. It supports only ASCII.
+     * can still apply bold again using markup. It supports only ASCII. You may want to also look at
+     * {@link #getKingthingsPetrock() Kingthings Petrock}; where Petrock is less-ornamented, Foundation is heavily
+     * ornamented, and Foundation may make sense for text associated with writers of high social status.
      * This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/yXPSQD5.png">Image link</a> (uses scaleTo(23, 30).adjustLineHeight(1.125f))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Kingthings%20Foundation.png">Image link</a> (uses scaleTo(23, 31))
      * <br>
      * Needs files:
      * <ul>
@@ -970,8 +1199,10 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.kingthingsFoundation == null) {
             try {
                 instance.kingthingsFoundation = new Font(instance.prefix + "KingthingsFoundation-standard.fnt",
-                        instance.prefix + "KingthingsFoundation-standard.png", STANDARD, 0, 25, 0, 0, true)
-                        .scaleTo(23, 31).setTextureFilter().setName("KingThings Foundation");
+                        instance.prefix + "KingthingsFoundation-standard.png", STANDARD, 0, 40, 0, 25, true)
+                        .setUnderlineMetrics(0f, -0.125f, 0.125f, -0.2f).setStrikethroughMetrics(0f, -0.125f, 0.125f, -0.2f)
+                        .setInlineImageMetrics(0f, 48f, 8f).setDescent(-20f)
+                        .scaleTo(23, 31).setTextureFilter().setName("Kingthings Foundation");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -979,6 +1210,90 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.kingthingsFoundation != null)
             return new Font(instance.kingthingsFoundation);
         throw new RuntimeException("Assets for getKingthingsFoundation() not found.");
+    }
+
+    private Font kingthingsPetrock;
+
+    /**
+     * Returns a Font already configured to use a clearly-legible variable-width medieval font, that should
+     * scale pretty well from a height of about 90 down to a height of maybe 30.
+     * Caches the result for later calls. The font used is Kingthings Petrock, a free (custom permissive license)
+     * typeface; it has a visual style similar to one used by some popular classic rock bands. It supports only ASCII
+     * and a small amount of extended Latin. Kingthings Petrock is similar to
+     * {@link #getKingthingsFoundation() Kingthings Foundation}, but Petrock isn't as heavily-ornamented, and looks more
+     * like "every-day usable" medieval or maybe Renaissance text.
+     * This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
+     * This may work well in a font family with other fonts that do not use a distance field effect.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Kingthings%20Petrock.png">Image link</a> (uses scaleTo(25, 32))
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/KingthingsPetrock-standard.fnt">KingthingsPetrock-standard.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/KingthingsPetrock-standard.png">KingthingsPetrock-standard.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Kingthings-License.txt">Kingthings-License.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font KingthingsPetrock.ttf
+     */
+    public static Font getKingthingsPetrock() {
+        initialize();
+        if (instance.kingthingsPetrock == null) {
+            try {
+                instance.kingthingsPetrock = new Font(instance.prefix + "KingthingsPetrock-standard.fnt",
+                        instance.prefix + "KingthingsPetrock-standard.png", STANDARD, 0, 8, 2, 0, true)
+                        .setDescent(-20f).setInlineImageMetrics(0f, 22f, 8f).setFancyLinePosition(0, 0.2f)
+                        .scaleTo(25, 32).setTextureFilter().setName("Kingthings Petrock");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.kingthingsPetrock != null)
+            return new Font(instance.kingthingsPetrock);
+        throw new RuntimeException("Assets for getKingthingsPetrock() not found.");
+    }
+
+    private Font lanaPixel;
+
+    /**
+     * Returns a Font already configured to use a variable-width pixel font with excellent Unicode support, that
+     * probably should only be used at integer multiples of its normal size.
+     * Caches the result for later calls. The font used is LanaPixel, an open-source (dual-licensed under the SIL Open
+     * Font License and Creative Commons Attribution License) typeface. It supports an incredible amount of glyphs,
+     * and is meant to allow localizing to just about any widely-used language.
+     * This uses a tiny standard bitmap font, and it can only be used as-is or scaled up by integer multiples.
+     * This defaults to having {@link Font#integerPosition} set to true, which currently does nothing (the code that
+     * enforces integer positions seems to ruin the appearance of any font that uses it, so that code isn't ever used
+     * now). This may work well in a font family with other fonts that do not use a distance field effect.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/LanaPixel.png">Image link</a> (uses width=20, height=15)
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/LanaPixel-standard.fnt">LanaPixel-standard.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/LanaPixel-standard.png">LanaPixel-standard.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/LanaPixel-CCBYLicense.txt">LanaPixel-CCBYLicense.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/LanaPixel-OpenFontLicense.txt">LanaPixel-OpenFontLicense.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font LanaPixel.ttf
+     */
+    public static Font getLanaPixel() {
+        initialize();
+        if (instance.lanaPixel == null) {
+            try {
+                instance.lanaPixel = new Font(instance.prefix + "LanaPixel-standard.fnt",
+                        instance.prefix + "LanaPixel-standard.png", STANDARD, 0, 0, 0, 0, false)
+                        .setInlineImageMetrics(-64, 0, 16).setFancyLinePosition(0f, 0.5f)
+                        .useIntegerPositions(true).setBoldStrength(0.5f).setLineMetrics(0f, -0.0625f, 0f, 0f)
+                        .setName("LanaPixel");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.lanaPixel != null)
+            return new Font(instance.lanaPixel);
+        throw new RuntimeException("Assets for getLanaPixel() not found.");
     }
 
     private Font libertinusSerif;
@@ -995,7 +1310,7 @@ public final class KnownFonts implements LifecycleListener {
      * {@link #getGentium()}. The MSDF files are still present in the same directory where they were, but they are no
      * longer used by TextraTypist.
      * <br>
-     * Preview: <a href="https://i.imgur.com/JSXMNzb.png">Image link</a> (uses width=40, height=34)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Libertinus%20Serif.png">Image link</a> (uses width=40, height=34)
      * <br>
      * Needs files:
      * <ul>
@@ -1011,7 +1326,8 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.libertinusSerif == null) {
             try {
                 instance.libertinusSerif = new Font(instance.prefix + "LibertinusSerif-standard.fnt",
-                        instance.prefix + "LibertinusSerif-standard.png", STANDARD, 0, 0, 0, 0, true)
+                        instance.prefix + "LibertinusSerif-standard.png", STANDARD, 0, 6, 0, 0, true)
+                        .setLineMetrics(0.05f, 0f, 0.0625f, -0.25f).setFancyLinePosition(0f, 0.15f)
                         .scaleTo(40, 34).setTextureFilter().setName("Libertinus Serif");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1022,6 +1338,44 @@ public final class KnownFonts implements LifecycleListener {
         throw new RuntimeException("Assets for getLibertinusSerif() not found.");
     }
 
+    private Font nowAlt;
+
+    /**
+     * Returns a Font already configured to use a variable-width geometric sans-serif font, that should
+     * scale cleanly to fairly large sizes or down to about 20 pixels.
+     * Caches the result for later calls. The font used is Now Alt, an open-source (SIL Open Font License) typeface by
+     * Hanken Design Co. It has decent glyph coverage for most European languages, but doesn't fully support Greek or
+     * Cyrillic. This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very
+     * well. This may work well in a font family with other fonts that do not use a distance field effect.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Now%20Alt.png">Image link</a> (uses width=29, height=33)
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Now-Alt-standard.fnt">Now-Alt-standard.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Now-Alt-standard.png">Now-Alt-standard.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Now-Alt-License.txt">Now-Alt-License.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font NowAlt.otf
+     */
+    public static Font getNowAlt() {
+        initialize();
+        if (instance.nowAlt == null) {
+            try {
+                instance.nowAlt = new Font(instance.prefix + "Now-Alt-standard.fnt",
+                        instance.prefix + "Now-Alt-standard.png", STANDARD, 0, 24, 0, 8, true)
+                        .setDescent(-12f).setLineMetrics(0.05f, -0.1f, 0f, 0f).setInlineImageMetrics(0f, 24f, 8f)
+                        .scaleTo(29, 33).setTextureFilter().setName("Now Alt");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.nowAlt != null)
+            return new Font(instance.nowAlt);
+        throw new RuntimeException("Assets for getNowAlt() not found.");
+    }
+
     private Font openSans;
 
     /**
@@ -1030,7 +1384,7 @@ public final class KnownFonts implements LifecycleListener {
      * scaled down nicely.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/ie2eflH.png">Image link</a> (uses width=20, height=28, adjustLineHeight(0.9f))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/OpenSans.png">Image link</a> (uses .scaleTo(20, 28))
      * <br>
      * Needs files:
      * <ul>
@@ -1046,8 +1400,9 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.openSans == null) {
             try {
                 instance.openSans = new Font(instance.prefix + "OpenSans-standard.fnt",
-                        instance.prefix + "OpenSans-standard.png", STANDARD, 0, 21, 0, 0, true)
-                        .scaleTo(20, 28).setTextureFilter().setName("OpenSans");
+                        instance.prefix + "OpenSans-standard.png", STANDARD, 0, 16, 0, 0, true).setDescent(-8f)
+                        .setLineMetrics(0f, -0.125f, 0f, -0.4f).setInlineImageMetrics(0f, 8f, 4f)
+                        .setFancyLinePosition(0f, 0.1f).scaleTo(20, 28).setTextureFilter().setName("OpenSans");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -1067,7 +1422,7 @@ public final class KnownFonts implements LifecycleListener {
      * This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/mcYmHPt.png">Image link</a> (uses width=31, height=35)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Oxanium.png">Image link</a> (uses width=31, height=35)
      * <br>
      * Needs files:
      * <ul>
@@ -1083,7 +1438,8 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.oxanium == null) {
             try {
                 instance.oxanium = new Font(instance.prefix + "Oxanium-standard.fnt",
-                        instance.prefix + "Oxanium-standard.png", STANDARD, 0, -2, -4, 0, true)
+                        instance.prefix + "Oxanium-standard.png", STANDARD, 0, 2, -4, 0, true).setDescent(-12f)
+                        .setLineMetrics(0f, -0.125f, 0f, 0f).setInlineImageMetrics(0f, 12f, 4f)
                         .scaleTo(31, 35).setTextureFilter().setName("Oxanium");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1102,18 +1458,18 @@ public final class KnownFonts implements LifecycleListener {
      * including all of Greek, at least most of Cyrillic, a good amount of extended Latin, all of Katakana and Hiragana,
      * many Hangul syllables, and literally thousands of CJK ideograms. This does not scale well except to integer
      * multiples, but it should look very crisp at its default size of about 8 pixels tall with variable width. This
-     * defaults to having {@link Font#integerPosition} set to true, which helps keep it pixel-perfect if 1 world unit is
-     * 1 pixel, but can cause major visual issues if 1 world unit corresponds to much more than 1 pixel.
+     * defaults to having {@link Font#integerPosition} set to true, which currently does nothing (the code that enforces
+     * integer positions seems to ruin the appearance of any font that uses it, so that code isn't ever used now).
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/Era8KZr.png">Image link</a> (uses width=(not set), height=8,
-     * useIntegerPositions(true); this size is small enough to make the scaled text unreadable in some places)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/QuanPixel.png">Image link</a> (uses width=12, height=12; this size is small
+     * enough to make the scaled text unreadable in some places)
      * <br>
      * Needs files:
      * <ul>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/QuanPixel-standard.fnt">QuanPixel-standard.fnt</a></li>
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/QuanPixel-standard.png">QuanPixel-standard.png</a></li>
-     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/QuanPixel-license.txt">QuanPixel-license.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/QuanPixel-License.txt">QuanPixel-License.txt</a></li>
      * </ul>
      *
      * @return the Font object that represents the 8px tall font QuanPixel
@@ -1126,8 +1482,9 @@ public final class KnownFonts implements LifecycleListener {
                 // This makes underlines use a different row than the bottom of letters.
                 instance.quanPixel = new Font(instance.prefix + "QuanPixel-standard.fnt",
                         instance.prefix + "QuanPixel-standard.png", STANDARD, 0, 2, 0, 2, false)
-                        .useIntegerPositions(true)
-                        .setName("QuanPixel");
+                        .setLineMetrics(0.0625f, -0.0625f, -0.25f, 0f).setInlineImageMetrics(-40f, -4f, 0f)
+                        .setFancyLinePosition(0f, 0.375f).useIntegerPositions(true).setDescent(-4f)
+                        .setBoldStrength(0.5f).setName("QuanPixel");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -1148,7 +1505,7 @@ public final class KnownFonts implements LifecycleListener {
      * This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/L8yaGLb.png">Image link</a> (uses width=25, height=30, adjustLineHeight(0.9f))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Roboto%20Condensed.png">Image link</a> (uses width=20, height=32)
      * <br>
      * Needs files:
      * <ul>
@@ -1164,8 +1521,10 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.robotoCondensed == null) {
             try {
                 instance.robotoCondensed = new Font(instance.prefix + "RobotoCondensed-standard.fnt",
-                        instance.prefix + "RobotoCondensed-standard.png", STANDARD, 0, 0, 0, 0, true)
-                        .scaleTo(25, 30).adjustLineHeight(0.9f).setTextureFilter().setName("Roboto Condensed");
+                        instance.prefix + "RobotoCondensed-standard.png", STANDARD, 0, 25, 0, 20, true)
+                        .setDescent(-15f).setInlineImageMetrics(0f, 8f, 6f).setFancyLinePosition(0f, 0.3f)
+                        .setUnderlineMetrics(0f, 0f, 0f, -0.4f).setStrikethroughMetrics(0f, -0.0625f, 0f, -0.4f)
+                        .scaleTo(20, 32).setTextureFilter().setName("Roboto Condensed");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -1187,7 +1546,7 @@ public final class KnownFonts implements LifecycleListener {
      * seem to have that problem.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/eOYkeRD.png">Image link</a> (uses width=48, height=32)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Tangerine.png">Image link</a> (uses width=48, height=32)
      * <br>
      * Needs files:
      * <ul>
@@ -1203,7 +1562,9 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.tangerine == null) {
             try {
                 instance.tangerine = new Font(instance.prefix + "Tangerine-standard.fnt",
-                        instance.prefix + "Tangerine-standard.png", STANDARD, 0f, 19f, 0f, 0f, true)
+                        instance.prefix + "Tangerine-standard.png", STANDARD, 0f, 16f, 0f, 0f, true)
+                        .setUnderlineMetrics(0f, 0f, 0f, -0.6f).setStrikethroughMetrics(0f, -0.125f, 0f, -0.6f)
+                        .setInlineImageMetrics(4f, 20f, 8f).setDescent(-20f).setFancyLinePosition(0f, 0.2f)
                         .scaleTo(48, 32).setTextureFilter().setName("Tangerine");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1225,7 +1586,7 @@ public final class KnownFonts implements LifecycleListener {
      * should be crisp enough when zoomed out. If you need to mix in images such as with {@link #addEmoji(Font)}, you
      * may be better off with {@link #getTangerine()}, the standard-bitmap-font version.
      * <br>
-     * Preview: <a href="https://i.imgur.com/4HWYooQ.png">Image link</a> (uses width=48, height=32, setCrispness(0.375f))
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Tangerine%20(SDF).png">Image link</a> (uses width=48, height=32, setCrispness(0.375f))
      * <br>
      * Needs files:
      * <ul>
@@ -1234,15 +1595,16 @@ public final class KnownFonts implements LifecycleListener {
      *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Tangerine-License.txt">Tangerine-License.txt</a></li>
      * </ul>
      *
-     * @return the Font object that can represent many sizes of the font Tangerine.ttf
+     * @return the Font object that can represent many sizes of the font Tangerine.ttf using SDF
      */
     public static Font getTangerineSDF() {
         initialize();
         if (instance.tangerineSDF == null) {
             try {
                 instance.tangerineSDF = new Font(instance.prefix + "Tangerine-sdf.fnt",
-                        instance.prefix + "Tangerine-sdf.png", SDF, 0f, 0f, 0f, 0, false)
-                        .scaleTo(48, 32).setCrispness(0.375f).setName("Tangerine (SDF)");
+                        instance.prefix + "Tangerine-sdf.png", SDF, 0f, 28f, 0f, 0, false).setFancyLinePosition(0, 0.2f)
+                        .setLineMetrics(-0.5f, 0f, 0f, 0f).setInlineImageMetrics(0f, 0f, 8f)
+                        .scaleTo(45, 30).setCrispness(0.375f).setName("Tangerine (SDF)");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -1262,7 +1624,7 @@ public final class KnownFonts implements LifecycleListener {
      * This uses a very-large standard bitmap font, which lets it be scaled down nicely but not scaled up very well.
      * This may work well in a font family with other fonts that do not use a distance field effect.
      * <br>
-     * Preview: <a href="https://i.imgur.com/RAxD5KI.png">Image link</a> (uses width=30, height=35)
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Yanone%20Kaffeesatz.png">Image link</a> (uses width=26, height=30)
      * <br>
      * Needs files:
      * <ul>
@@ -1278,8 +1640,9 @@ public final class KnownFonts implements LifecycleListener {
         if (instance.kaffeesatz == null) {
             try {
                 instance.kaffeesatz = new Font(instance.prefix + "YanoneKaffeesatz-standard.fnt",
-                        instance.prefix + "YanoneKaffeesatz-standard.png", STANDARD, 2f, -2f, 0f, 0, true)
-                        .scaleTo(26, 30).adjustLineHeight(0.8f).setTextureFilter().setName("Yanone Kaffeesatz");
+                        instance.prefix + "YanoneKaffeesatz-standard.png", STANDARD, 2f, 6f, 0f, 0, true)
+                        .setDescent(-8f).setLineMetrics(0f, -0.2f, 0f, 0f).setInlineImageMetrics(0f, 18f, 4f)
+                        .scaleTo(26, 30).setTextureFilter().setName("Yanone Kaffeesatz");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -1289,230 +1652,85 @@ public final class KnownFonts implements LifecycleListener {
         throw new RuntimeException("Assets for getYanoneKaffeesatz() not found.");
     }
 
-    /**
-     * Horribly duplicated because this is private in TextureAtlas.
-     * This can be entirely replaced by Consumer from JDK 8 once RoboVM supports it.
-     * @param <T> the type that this can parse
-     */
-    private interface Field<T> {
-        void parse(T object);
-    }
+    private Font kaffeesatzMSDF;
 
     /**
-     * This is exactly like {@link TextureAtlas#TextureAtlas(FileHandle, FileHandle, boolean)}, except it jumps through
-     * some hoops to ensure the atlas is loaded with UTF-8 encoding. Loading an atlas that uses Unicode names for its
-     * TextureRegions can have those names be unusable if TextureAtlas' normal default platform encoding is used; this
-     * primarily affects Java versions before 18 where the JVM flag {@code -Dfile.encoding=UTF-8} was missing when a JAR
-     * is launched.
-     * @param packFile the FileHandle for the atlas file
-     * @param imagesDir the FileHandle for the folder that holds the images used by the atlas file
-     * @param flip If true, all regions loaded will be flipped for use with a perspective where 0,0 is the upper left corner.
-     * @return a new TextureAtlas loaded from the given files.
+     * Returns a Font already configured to use a variable-width, narrow, humanist font, that should
+     * scale very well up or down, but isn't compatible with inline images such as {@link #addEmoji(Font) emoji}.
+     * Caches the result for later calls. The font used is Yanone Kaffeesatz, a free (OFL) typeface. It supports a lot
+     * of Latin, Cyrillic, and some extended Latin, but not Greek.
+     * This uses the Multi-channel Signed Distance Field (MSDF) technique as opposed to the normal Signed Distance Field
+     * technique, which gives the rendered font sharper edges and precise corners instead of rounded tips on strokes.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Yanone%20Kaffeesatz%20(MSDF).png">Image link</a> (uses width=26, height=30, setCrispness(2.5f))
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/YanoneKaffeesatz-msdf.fnt">YanoneKaffeesatz-msdf.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/YanoneKaffeesatz-msdf.png">YanoneKaffeesatz-msdf.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/YanoneKaffeesatz-License.txt">YanoneKaffeesatz-License.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font YanoneKaffeesatz.ttf using MSDF
      */
-    public static TextureAtlas loadUnicodeAtlas(FileHandle packFile, FileHandle imagesDir, boolean flip) {
-        return new TextureAtlas(new TextureAtlas.TextureAtlasData(packFile, imagesDir, flip){
-            private int readEntry (String[] entry, @Null String line) {
-                if (line == null) return 0;
-                line = line.trim();
-                if (line.length() == 0) return 0;
-                int colon = line.indexOf(':');
-                if (colon == -1) return 0;
-                entry[0] = line.substring(0, colon).trim();
-                for (int i = 1, lastMatch = colon + 1;; i++) {
-                    int comma = line.indexOf(',', lastMatch);
-                    if (comma == -1) {
-                        entry[i] = line.substring(lastMatch).trim();
-                        return i;
-                    }
-                    entry[i] = line.substring(lastMatch, comma).trim();
-                    lastMatch = comma + 1;
-                    if (i == 4) return 4;
-                }
+    public static Font getYanoneKaffeesatzMSDF() {
+        initialize();
+        if (instance.kaffeesatzMSDF == null) {
+            try {
+                instance.kaffeesatzMSDF = new Font(instance.prefix + "YanoneKaffeesatz-msdf.fnt",
+                        instance.prefix + "YanoneKaffeesatz-msdf.png", MSDF, 0f, 20f, 0f, 0, true)
+                        .setFancyLinePosition(0f, 0.25f)
+                        .scaleTo(26, 30).setCrispness(2.5f).setName("Yanone Kaffeesatz (MSDF)");
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-
-            public void load (FileHandle packFile, FileHandle imagesDir, boolean flip) {
-                final String[] entry = new String[5];
-
-                ObjectMap<String, Field<Page>> pageFields = new ObjectMap<>(15, 0.99f); // Size needed to avoid collisions.
-                pageFields.put("size", new Field<Page>() {
-                    public void parse (Page page) {
-                        page.width = Integer.parseInt(entry[1]);
-                        page.height = Integer.parseInt(entry[2]);
-                    }
-                });
-                pageFields.put("format", new Field<Page>() {
-                    public void parse (Page page) {
-                        page.format = Pixmap.Format.valueOf(entry[1]);
-                    }
-                });
-                pageFields.put("filter", new Field<Page>() {
-                    public void parse (Page page) {
-                        page.minFilter = Texture.TextureFilter.valueOf(entry[1]);
-                        page.magFilter = Texture.TextureFilter.valueOf(entry[2]);
-                        page.useMipMaps = page.minFilter.isMipMap();
-                    }
-                });
-                pageFields.put("repeat", new Field<Page>() {
-                    public void parse (Page page) {
-                        if (entry[1].indexOf('x') != -1) page.uWrap = Texture.TextureWrap.Repeat;
-                        if (entry[1].indexOf('y') != -1) page.vWrap = Texture.TextureWrap.Repeat;
-                    }
-                });
-                pageFields.put("pma", new Field<Page>() {
-                    public void parse (Page page) {
-                        page.pma = entry[1].equals("true");
-                    }
-                });
-
-                final boolean[] hasIndexes = {false};
-                ObjectMap<String, Field<Region>> regionFields = new ObjectMap<>(127, 0.99f); // Size needed to avoid collisions.
-                regionFields.put("xy", new Field<Region>() { // Deprecated, use bounds.
-                    public void parse (Region region) {
-                        region.left = Integer.parseInt(entry[1]);
-                        region.top = Integer.parseInt(entry[2]);
-                    }
-                });
-                regionFields.put("size", new Field<Region>() { // Deprecated, use bounds.
-                    public void parse (Region region) {
-                        region.width = Integer.parseInt(entry[1]);
-                        region.height = Integer.parseInt(entry[2]);
-                    }
-                });
-                regionFields.put("bounds", new Field<Region>() {
-                    public void parse (Region region) {
-                        region.left = Integer.parseInt(entry[1]);
-                        region.top = Integer.parseInt(entry[2]);
-                        region.width = Integer.parseInt(entry[3]);
-                        region.height = Integer.parseInt(entry[4]);
-                    }
-                });
-                regionFields.put("offset", new Field<Region>() { // Deprecated, use offsets.
-                    public void parse (Region region) {
-                        region.offsetX = Integer.parseInt(entry[1]);
-                        region.offsetY = Integer.parseInt(entry[2]);
-                    }
-                });
-                regionFields.put("orig", new Field<Region>() { // Deprecated, use offsets.
-                    public void parse (Region region) {
-                        region.originalWidth = Integer.parseInt(entry[1]);
-                        region.originalHeight = Integer.parseInt(entry[2]);
-                    }
-                });
-                regionFields.put("offsets", new Field<Region>() {
-                    public void parse (Region region) {
-                        region.offsetX = Integer.parseInt(entry[1]);
-                        region.offsetY = Integer.parseInt(entry[2]);
-                        region.originalWidth = Integer.parseInt(entry[3]);
-                        region.originalHeight = Integer.parseInt(entry[4]);
-                    }
-                });
-                regionFields.put("rotate", new Field<Region>() {
-                    public void parse (Region region) {
-                        String value = entry[1];
-                        if (value.equals("true"))
-                            region.degrees = 90;
-                        else if (!value.equals("false")) //
-                            region.degrees = Integer.parseInt(value);
-                        region.rotate = region.degrees == 90;
-                    }
-                });
-                regionFields.put("index", new Field<Region>() {
-                    public void parse (Region region) {
-                        region.index = Integer.parseInt(entry[1]);
-                        if (region.index != -1) hasIndexes[0] = true;
-                    }
-                });
-
-                BufferedReader reader = null;
-                try {
-                    // all this for just one line changed...
-                    reader = new BufferedReader(new InputStreamReader(packFile.read(), "UTF-8"), 1024);
-                } catch (UnsupportedEncodingException e) {
-                    throw new RuntimeException(e); // This should never happen on a sane JVM.
-                }
-                try {
-                    String line = reader.readLine();
-                    // Ignore empty lines before first entry.
-                    while (line != null && line.trim().length() == 0)
-                        line = reader.readLine();
-                    // Header entries.
-                    while (true) {
-                        if (line == null || line.trim().length() == 0) break;
-                        if (readEntry(entry, line) == 0) break; // Silently ignore all header fields.
-                        line = reader.readLine();
-                    }
-                    // Page and region entries.
-                    Page page = null;
-                    Array<String> names = null;
-                    Array<int[]> values = null;
-                    while (line != null) {
-                        if (line.trim().length() == 0) {
-                            page = null;
-                            line = reader.readLine();
-                        } else if (page == null) {
-                            page = new Page();
-                            page.textureFile = imagesDir.child(line);
-                            while (readEntry(entry, line = reader.readLine()) != 0) {
-                                Field<Page> field = pageFields.get(entry[0]);
-                                if (field != null) field.parse(page); // Silently ignore unknown page fields.
-                            }
-                            getPages().add(page);
-                        } else {
-                            Region region = new Region();
-                            region.page = page;
-                            region.name = line.trim();
-                            if (flip) region.flip = true;
-                            while (true) {
-                                int count = readEntry(entry, line = reader.readLine());
-                                if (count == 0) break;
-                                Field<Region> field = regionFields.get(entry[0]);
-                                if (field != null)
-                                    field.parse(region);
-                                else {
-                                    if (names == null) {
-                                        names = new Array<>(8);
-                                        values = new Array<>(8);
-                                    }
-                                    names.add(entry[0]);
-                                    int[] entryValues = new int[count];
-                                    for (int i = 0; i < count; i++) {
-                                        try {
-                                            entryValues[i] = Integer.parseInt(entry[i + 1]);
-                                        } catch (NumberFormatException ignored) { // Silently ignore non-integer values.
-                                        }
-                                    }
-                                    values.add(entryValues);
-                                }
-                            }
-                            if (region.originalWidth == 0 && region.originalHeight == 0) {
-                                region.originalWidth = region.width;
-                                region.originalHeight = region.height;
-                            }
-                            if (names != null && names.size > 0) {
-                                region.names = names.toArray(String.class);
-                                region.values = values.toArray(int[].class);
-                                names.clear();
-                                values.clear();
-                            }
-                            getRegions().add(region);
-                        }
-                    }
-                } catch (Exception ex) {
-                    throw new GdxRuntimeException("Error reading texture atlas file: " + packFile, ex);
-                } finally {
-                    StreamUtils.closeQuietly(reader);
-                }
-
-                if (hasIndexes[0]) {
-                    getRegions().sort(new Comparator<Region>() {
-                        public int compare (Region region1, Region region2) {
-                            return (region1.index & Integer.MAX_VALUE) - (region2.index & Integer.MAX_VALUE);
-                        }
-                    });
-                }
-            }
-        });
+        }
+        if (instance.kaffeesatzMSDF != null)
+            return new Font(instance.kaffeesatzMSDF);
+        throw new RuntimeException("Assets for getYanoneKaffeesatzMSDF() not found.");
     }
+
+    private Font yataghanMSDF;
+
+    /**
+     * Returns a Font already configured to use a variable-width, narrow, "dark fantasy" font, that should
+     * scale very well up or down, but isn't compatible with inline images such as {@link #addEmoji(Font) emoji}.
+     * Caches the result for later calls. The font used is Yataghan, a widely-distributed typeface. It supports ASCII
+     * and some extended Latin, but not much else.
+     * This uses the Multi-channel Signed Distance Field (MSDF) technique as opposed to the normal Signed Distance Field
+     * technique, which gives the rendered font sharper edges and precise corners instead of rounded tips on strokes.
+     * <br>
+     * I don't know who the original author of Yataghan was; if you are the original author and want attribution or want
+     * this font removed, please post an issue on the tommyettinger/textratypist GitHub repo, or email tommyettinger.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/Yataghan%20(MSDF).png">Image link</a> (uses width=20, height=32)
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Yataghan-msdf.fnt">Yataghan-msdf.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Yataghan-msdf.png">Yataghan-msdf.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Yataghan-License.txt">Yataghan-License.txt</a></li>
+     * </ul>
+     *
+     * @return the Font object that can represent many sizes of the font Yataghan.ttf using MSDF
+     */
+    public static Font getYataghanMSDF() {
+        initialize();
+        if (instance.yataghanMSDF == null) {
+            try {
+                instance.yataghanMSDF = new Font(instance.prefix + "Yataghan-msdf.fnt",
+                        instance.prefix + "Yataghan-msdf.png", MSDF, 0f, 4f, 0f, 0f, true)
+                        .setLineMetrics(0f, 0.125f, 0f, -0.4f).setFancyLinePosition(0, 0.375f)
+                        .scaleTo(20, 32).setName("Yataghan (MSDF)");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.yataghanMSDF != null)
+            return new Font(instance.yataghanMSDF);
+        throw new RuntimeException("Assets for getYataghanMSDF() not found.");
+    }
+
     private TextureAtlas twemoji;
 
     /**
@@ -1522,7 +1740,26 @@ public final class KnownFonts implements LifecycleListener {
      * Twemoji atlas for later calls. This tries to load the files "Twemoji.atlas" and "Twemoji.png" from the internal
      * storage first, and if that fails, it tries to load them from local storage in the current working directory.
      * <br>
-     * Preview: <a href="https://i.imgur.com/Mw0fWA7.png">Image link</a> (uses the font {@link #getYanoneKaffeesatz()})
+     * You can add emoji to a font as inline images with KnownFonts.addEmoji(Font).
+     * Emoji don't work at all with MSDF fonts, and don't support more than one color with SDF fonts, but work as intended
+     * with "standard" fonts (without a distance field effect). They can scale reasonably well down, and less-reasonably well
+     * up, but at typical text sizes (12-30 pixels in height) they tend to be legible. There are over 3000 emoji in the Twemoji
+     * set, and they are accessible both by name, using the syntax <code>[+clown face]</code>, and by entering the actual
+     * emoji, using the syntax <code>[+🤡]</code>. You can search for names in {@code Twemoji.atlas}, or use the emoji picker in
+     * <a href="https://github.com/raeleus/skin-composer">Skin Composer</a> to navigate by category. You can also use the
+     * emoji picker present in some OSes, such as how Win+. allows selecting an emoji on Windows 10 and up.
+     * Programmatically, you can use {@link Font#nameLookup} to look up the internal {@code char} this uses for a given
+     * name or emoji, and {@link Font#namesByCharCode} to go from such an internal code to an emoji (as UTF-8).
+     * <br>
+     * Note that there isn't enough available space in a Font to add both emoji with this and icons with
+     * {@link #addGameIcons(Font)}. You can, however, make two copies of a Font, add emoji to one and icons to the
+     * other, and put both in a FontFamily, so you can access both atlases in the same block of text.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/EmojiPreview.png">Image link</a> (uses
+     * the font {@link #getAStarry()} and {@code [%?blacken]} mode)
+     * <br>
+     * You can see all emoji and the names they use
+     * <a href="https://tommyettinger.github.io/twemoji-atlas/">at this GitHub Pages site</a>.
      * <br>
      * Needs files:
      * <ul>
@@ -1535,29 +1772,313 @@ public final class KnownFonts implements LifecycleListener {
      * @return {@code changing}, after the emoji atlas has been added
      */
     public static Font addEmoji(Font changing) {
+        return addEmoji(changing, 0f, 0f, 0f);
+    }
+    /**
+     * Takes a Font and adds the Twemoji icon set to it, making the glyphs available using {@code [+name]} syntax.
+     * You can use the name of an emoji, such as {@code [+clown face]}, or equivalently use the actual emoji, such as
+     * {@code [+🤡]}, with the latter preferred because the names can be unwieldy or hard to get right. This caches the
+     * Twemoji atlas for later calls. This tries to load the files "Twemoji.atlas" and "Twemoji.png" from the internal
+     * storage first, and if that fails, it tries to load them from local storage in the current working directory.
+     * There are over 3000 emoji in the Twemoji set;
+     * <a href="https://github.com/twitter/twemoji#attribution-requirements">it requires attribution to use</a>.
+     * <br>
+     * Emoji don't work at all with MSDF fonts, and don't support more than one color with SDF fonts, but work as
+     * intended with "standard" fonts (without a distance field effect). They can scale reasonably well down, and
+     * less-reasonably well up, but at typical text sizes (12-30 pixels in height) they tend to be legible.
+     * You can search for names in {@code Twemoji.atlas}, or use the emoji picker in
+     * <a href="https://github.com/raeleus/skin-composer">Skin Composer</a> to navigate by category. You can also use
+     * the emoji picker present in some OSes, such as how Win+. allows selecting an emoji on Windows 10 and up.
+     * Programmatically, you can use {@link Font#nameLookup} to look up the internal {@code char} this uses for a given
+     * name or emoji, and {@link Font#namesByCharCode} to go from such an internal code to an emoji (as UTF-8).
+     * <br>
+     * Note that there isn't enough available space in a Font to add both emoji with this and icons with
+     * {@link #addGameIcons(Font)}. You can, however, make two copies of a Font, add emoji to one and icons to the
+     * other, and put both in a FontFamily, so you can access both atlases in the same block of text.
+     * <br>
+     * This overload allows customizing the x/y offsets and x-advance for every emoji this puts in a Font.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/EmojiPreview.png">Image link</a> (uses
+     * the font {@link #getAStarry()} and {@code [%?blacken]} mode)
+     * <br>
+     * You can see all emoji and the names they use
+     * <a href="https://tommyettinger.github.io/twemoji-atlas/">at this GitHub Pages site</a>.
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Twemoji.atlas">Twemoji.atlas</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Twemoji.png">Twemoji.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Twemoji-License.txt">Twemoji-License.txt</a></li>
+     * </ul>
+     *
+     * @param changing a Font that will have over 3000 emoji added to it, with more aliases
+     * @param offsetXChange will be added to the {@link Font.GlyphRegion#offsetX} of each added glyph
+     * @param offsetYChange will be added to the {@link Font.GlyphRegion#offsetY} of each added glyph
+     * @param xAdvanceChange will be added to the {@link Font.GlyphRegion#xAdvance} of each added glyph
+     * @return {@code changing}, after the emoji atlas has been added
+     */
+    public static Font addEmoji(Font changing, float offsetXChange, float offsetYChange, float xAdvanceChange) {
+        return addEmoji(changing, "", "", offsetXChange, offsetYChange, xAdvanceChange);
+    }
+    /**
+     * Takes a Font and adds the Twemoji icon set to it, making the glyphs available using {@code [+name]} syntax.
+     * You can use the name of an emoji, such as {@code [+clown face]}, or equivalently use the actual emoji, such as
+     * {@code [+🤡]}, with the latter preferred because the names can be unwieldy or hard to get right. This caches the
+     * Twemoji atlas for later calls. This tries to load the files "Twemoji.atlas" and "Twemoji.png" from the internal
+     * storage first, and if that fails, it tries to load them from local storage in the current working directory.
+     * There are over 3000 emoji in the Twemoji set;
+     * <a href="https://github.com/twitter/twemoji#attribution-requirements">it requires attribution to use</a>.
+     * <br>
+     * Emoji don't work at all with MSDF fonts, and don't support more than one color with SDF fonts, but work as
+     * intended with "standard" fonts (without a distance field effect). They can scale reasonably well down, and
+     * less-reasonably well up, but at typical text sizes (12-30 pixels in height) they tend to be legible.
+     * You can search for names in {@code Twemoji.atlas}, or use the emoji picker in
+     * <a href="https://github.com/raeleus/skin-composer">Skin Composer</a> to navigate by category. You can also use
+     * the emoji picker present in some OSes, such as how Win+. allows selecting an emoji on Windows 10 and up.
+     * Programmatically, you can use {@link Font#nameLookup} to look up the internal {@code char} this uses for a given
+     * name or emoji, and {@link Font#namesByCharCode} to go from such an internal code to an emoji (as UTF-8).
+     * <br>
+     * Note that there isn't enough available space in a Font to add both emoji with this and icons with
+     * {@link #addGameIcons(Font)}. You can, however, make two copies of a Font, add emoji to one and icons to the
+     * other, and put both in a FontFamily, so you can access both atlases in the same block of text.
+     * <br>
+     * This overload allows customizing the x/y offsets and x-advance for every emoji this puts in a Font. It also
+     * allows specifying Strings to prepend before and append after each name in the font, including emoji names.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/EmojiPreview.png">Image link</a> (uses
+     * the font {@link #getAStarry()} and {@code [%?blacken]} mode)
+     * <br>
+     * You can see all emoji and the names they use
+     * <a href="https://tommyettinger.github.io/twemoji-atlas/">at this GitHub Pages site</a>.
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Twemoji.atlas">Twemoji.atlas</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Twemoji.png">Twemoji.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Twemoji-License.txt">Twemoji-License.txt</a></li>
+     * </ul>
+     *
+     * @param changing a Font that will have over 3000 emoji added to it, with more aliases
+     * @param prepend will be prepended before each name in the atlas; if null, will be treated as ""
+     * @param append will be appended after each name in the atlas; if null, will be treated as ""
+     * @param offsetXChange will be added to the {@link Font.GlyphRegion#offsetX} of each added glyph
+     * @param offsetYChange will be added to the {@link Font.GlyphRegion#offsetY} of each added glyph
+     * @param xAdvanceChange will be added to the {@link Font.GlyphRegion#xAdvance} of each added glyph
+     * @return {@code changing}, after the emoji atlas has been added
+     */
+    public static Font addEmoji(Font changing, String prepend, String append, float offsetXChange, float offsetYChange, float xAdvanceChange) {
         initialize();
         if (instance.twemoji == null) {
             try {
                 FileHandle atlas = Gdx.files.internal(instance.prefix + "Twemoji.atlas");
                 if (!atlas.exists() && Gdx.files.isLocalStorageAvailable()) atlas = Gdx.files.local(instance.prefix + "Twemoji.atlas");
                 if (Gdx.files.internal(instance.prefix + "Twemoji.png").exists())
-                    instance.twemoji = loadUnicodeAtlas(atlas, Gdx.files.internal(
-                            instance.prefix).isDirectory()
-                            ? Gdx.files.internal(instance.prefix)
-                            : Gdx.files.internal(instance.prefix).parent(), false);
+                    instance.twemoji = new TextureAtlas(atlas, atlas.parent(), false);
                 else if (Gdx.files.isLocalStorageAvailable() && Gdx.files.local(instance.prefix + "Twemoji.png").exists())
-                    instance.twemoji = loadUnicodeAtlas(atlas, Gdx.files.local(
-                            instance.prefix).isDirectory()
-                            ? Gdx.files.local(instance.prefix)
-                            : Gdx.files.local(instance.prefix).parent(), false);
+                    instance.twemoji = new TextureAtlas(atlas, atlas.parent(), false);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
         if (instance.twemoji != null) {
-            return changing.addAtlas(instance.twemoji);
+            return changing.addAtlas(instance.twemoji, prepend, append,
+                    offsetXChange, offsetYChange - changing.descent * changing.scaleY, xAdvanceChange);
         }
         throw new RuntimeException("Assets 'Twemoji.atlas' and 'Twemoji.png' not found.");
+    }
+
+    private TextureAtlas gameIcons;
+
+    /**
+     * Takes a Font and adds the <a href="https://game-icons.net/">Game-Icons.net</a> icon set to it, making the glyphs
+     * available using {@code [+name]} syntax. Unlike the emoji used by {@link #addEmoji(Font)}, icons here are always.
+     * retrieved by name, and names are always all-lower-case, separated by dashes ({@code '-'}). This caches the
+     * Game-Icons.net atlas for later calls. This tries to load the files "Game-Icons.atlas" and "Game-Icons.png" from
+     * the internal storage first, and if that fails, it tries to load them from local storage in the current working
+     * directory. There are 4131 images in this edition of the Game-Icons.net icons (from December 20, 2022), and
+     * <a href="https://game-icons.net/faq.html">it requires attribution to use</a>.
+     * <br>
+     * Although these icons might work with MSDF fonts, they should work with standard and SDF fonts. They can
+     * scale reasonably well down, and less-reasonably well up, but at typical text sizes (12-30 pixels in height) they
+     * tend to be legible. All icons use only the color white with various levels of transparency, so they can be
+     * colored like normal text glyphs. You can search for names in {@code Game-Icons.atlas}.
+     * Programmatically, you can use {@link Font#nameLookup} to look up the internal {@code char} this uses for a given
+     * name, and {@link Font#namesByCharCode} to go from such an internal code to the corresponding name.
+     * <br>
+     * Note that there isn't enough available space in a Font to add both emoji with {@link #addEmoji(Font)} and icons
+     * with this. You can, however, make two copies of a Font, add emoji to one and icons to the other, and put both in
+     * a FontFamily, so you can access both atlases in the same block of text.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/GameIconsPreview.png">Image link</a> (uses
+     * the font {@link #getNowAlt()} and {@code [%?blacken]} mode)
+     * <br>
+     * You can see all icons and the names they use
+     * <a href="https://tommyettinger.github.io/game-icons-net-atlas/">at this GitHub Pages site</a>.
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons.atlas">Game-Icons.atlas</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons.png">Game-Icons.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons-License.txt">Game-Icons-License.txt</a></li>
+     * </ul>
+     *
+     * @param changing a Font that will have over 4000 icons added to it
+     * @return {@code changing}, after the icon atlas has been added
+     */
+    public static Font addGameIcons(Font changing) {
+        return addGameIcons(changing, 0f, 0f, 0f);
+    }
+    /**
+     * Takes a Font and adds the <a href="https://game-icons.net/">Game-Icons.net</a> icon set to it, making the glyphs
+     * available using {@code [+name]} syntax. Unlike the emoji used by {@link #addEmoji(Font)}, icons here are always.
+     * retrieved by name, and names are always all-lower-case, separated by dashes ({@code '-'}). This caches the
+     * Game-Icons.net atlas for later calls. This tries to load the files "Game-Icons.atlas" and "Game-Icons.png" from
+     * the internal storage first, and if that fails, it tries to load them from local storage in the current working
+     * directory. There are 4131 images in this edition of the Game-Icons.net icons (from December 20, 2022), and
+     * <a href="https://game-icons.net/faq.html">it requires attribution to use</a>.
+     * <br>
+     * Although these icons might work with MSDF fonts, they should work with standard and SDF fonts. They can
+     * scale reasonably well down, and less-reasonably well up, but at typical text sizes (12-30 pixels in height) they
+     * tend to be legible. All icons use only the color white with various levels of transparency, so they can be
+     * colored like normal text glyphs. You can search for names in {@code Game-Icons.atlas}.
+     * Programmatically, you can use {@link Font#nameLookup} to look up the internal {@code char} this uses for a given
+     * name, and {@link Font#namesByCharCode} to go from such an internal code to the corresponding name.
+     * <br>
+     * Note that there isn't enough available space in a Font to add both emoji with {@link #addEmoji(Font)} and icons
+     * with this. You can, however, make two copies of a Font, add emoji to one and icons to the other, and put both in
+     * a FontFamily, so you can access both atlases in the same block of text.
+     * <br>
+     * This overload allows customizing the x/y offsets and x-advance for every icon this puts in a Font.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/GameIconsPreview.png">Image link</a> (uses
+     * the font {@link #getNowAlt()} and {@code [%?blacken]} mode)
+     * <br>
+     * You can see all icons and the names they use
+     * <a href="https://tommyettinger.github.io/game-icons-net-atlas/">at this GitHub Pages site</a>.
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons.atlas">Game-Icons.atlas</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons.png">Game-Icons.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons-License.txt">Game-Icons-License.txt</a></li>
+     * </ul>
+     *
+     * @param changing a Font that will have over 4000 icons added to it
+     * @param offsetXChange will be added to the {@link Font.GlyphRegion#offsetX} of each added glyph
+     * @param offsetYChange will be added to the {@link Font.GlyphRegion#offsetY} of each added glyph
+     * @param xAdvanceChange will be added to the {@link Font.GlyphRegion#xAdvance} of each added glyph
+     * @return {@code changing}, after the icon atlas has been added
+     */
+    public static Font addGameIcons(Font changing, float offsetXChange, float offsetYChange, float xAdvanceChange) {
+        return addGameIcons(changing, "", "", offsetXChange, offsetYChange, xAdvanceChange);
+    }
+
+    /**
+     * Takes a Font and adds the <a href="https://game-icons.net/">Game-Icons.net</a> icon set to it, making the glyphs
+     * available using {@code [+name]} syntax. Unlike the emoji used by {@link #addEmoji(Font)}, icons here are always.
+     * retrieved by name, and names are always all-lower-case, separated by dashes ({@code '-'}). This caches the
+     * Game-Icons.net atlas for later calls. This tries to load the files "Game-Icons.atlas" and "Game-Icons.png" from
+     * the internal storage first, and if that fails, it tries to load them from local storage in the current working
+     * directory. There are 4131 images in this edition of the Game-Icons.net icons (from December 20, 2022), and
+     * <a href="https://game-icons.net/faq.html">it requires attribution to use</a>.
+     * <br>
+     * Although these icons might work with MSDF fonts, they should work with standard and SDF fonts. They can
+     * scale reasonably well down, and less-reasonably well up, but at typical text sizes (12-30 pixels in height) they
+     * tend to be legible. All icons use only the color white with various levels of transparency, so they can be
+     * colored like normal text glyphs. You can search for names in {@code Game-Icons.atlas}.
+     * Programmatically, you can use {@link Font#nameLookup} to look up the internal {@code char} this uses for a given
+     * name, and {@link Font#namesByCharCode} to go from such an internal code to the corresponding name.
+     * <br>
+     * Note that there isn't enough available space in a Font to add both emoji with {@link #addEmoji(Font)} and icons
+     * with this. You can, however, make two copies of a Font, add emoji to one and icons to the other, and put both in
+     * a FontFamily, so you can access both atlases in the same block of text.
+     * <br>
+     * This overload allows customizing the x/y offsets and x-advance for every icon this puts in a Font. It also
+     * allows specifying Strings to prepend before and append after each name in the font.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/GameIconsPreview.png">Image link</a> (uses
+     * the font {@link #getNowAlt()} and {@code [%?blacken]} mode)
+     * <br>
+     * You can see all icons and the names they use
+     * <a href="https://tommyettinger.github.io/game-icons-net-atlas/">at this GitHub Pages site</a>.
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons.atlas">Game-Icons.atlas</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons.png">Game-Icons.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons-License.txt">Game-Icons-License.txt</a></li>
+     * </ul>
+     *
+     * @param changing a Font that will have over 4000 icons added to it
+     * @param prepend will be prepended before each name in the atlas; if null, will be treated as ""
+     * @param append will be appended after each name in the atlas; if null, will be treated as ""
+     * @param offsetXChange will be added to the {@link Font.GlyphRegion#offsetX} of each added glyph
+     * @param offsetYChange will be added to the {@link Font.GlyphRegion#offsetY} of each added glyph
+     * @param xAdvanceChange will be added to the {@link Font.GlyphRegion#xAdvance} of each added glyph
+     * @return {@code changing}, after the icon atlas has been added
+     */
+    public static Font addGameIcons(Font changing, String prepend, String append, float offsetXChange, float offsetYChange, float xAdvanceChange) {
+        initialize();
+        if (instance.gameIcons == null) {
+            try {
+                FileHandle atlas = Gdx.files.internal(instance.prefix + "Game-Icons.atlas");
+                if (!atlas.exists() && Gdx.files.isLocalStorageAvailable()) atlas = Gdx.files.local(instance.prefix + "Game-Icons.atlas");
+                if (Gdx.files.internal(instance.prefix + "Game-Icons.png").exists())
+                    instance.gameIcons = new TextureAtlas(atlas, atlas.parent(), false);
+                else if (Gdx.files.isLocalStorageAvailable() && Gdx.files.local(instance.prefix + "Game-Icons.png").exists())
+                    instance.gameIcons = new TextureAtlas(atlas, atlas.parent(), false);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.gameIcons != null) {
+            return changing.addAtlas(instance.gameIcons, prepend, append,
+                    offsetXChange, offsetYChange - changing.descent * changing.scaleY, xAdvanceChange);
+        }
+        throw new RuntimeException("Assets 'Game-Icons.atlas' and 'Game-Icons.png' not found.");
+    }
+
+    private Font gameIconsFont;
+
+    /**
+     * Gets a typically-square Font that is meant to be used in a FontFamily, allowing switching to a Font with the many
+     * game-icons.net icons. The base Font this uses is {@link #getAStarry()}, because it is perfectly square by
+     * default, and this needs all of AStarry's assets. It also needs the assets for {@link #addGameIcons(Font)} to be
+     * present, since those will be available with this Font. The name this will use in a FontFamily is "Icons". You can
+     * specify the width and height you want for the icons; typically they are the same, because the icons here are
+     * square, and you probably want the height to match the line height for your main font. It isn't expected that
+     * many users would want to use the non-icon glyphs in the font. The reason this is needed is that you can't fit
+     * both the emoji from {@link #addEmoji(Font)} and the icons from {@link #addGameIcons(Font)} in one Font, but you
+     * can swap between two different Fonts in a FontFamily, one with emoji and one with icons.
+     * <br>
+     * Preview: <a href="https://tommyettinger.github.io/textratypist/previews/GameIconsPreview.png">Image link</a> (uses
+     * the font {@link #getNowAlt()} and {@code [%?blacken]} mode)
+     * <br>
+     * Needs files:
+     * <ul>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-standard.fnt">AStarry-standard.fnt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-standard.png">AStarry-standard.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/AStarry-License.txt">AStarry-License.txt</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons.atlas">Game-Icons.atlas</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons.png">Game-Icons.png</a></li>
+     *     <li><a href="https://github.com/tommyettinger/textratypist/blob/main/knownFonts/Game-Icons-License.txt">Game-Icons-License.txt</a></li>
+     * </ul>
+     * @param width the width of a single glyph in the returned Font; usually matches the line-height of other text
+     * @param height the height of a single glyph in the returned Font; usually matches the line-height of other text
+     * @return a preconfigured Font using {@link #getAStarry()} and {@link #addGameIcons(Font)}, with name "Icons"
+     */
+    public static Font getGameIconsFont(float width, float height) {
+        initialize();
+        if (instance.gameIconsFont == null) {
+            try {
+                instance.gameIconsFont = KnownFonts.addGameIcons(KnownFonts.getAStarry().scaleTo(width, height).setName("Icons"));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (instance.gameIconsFont != null)
+            return new Font(instance.gameIconsFont);
+        throw new RuntimeException("Assets for getGameIconsFont() not found.");
     }
 
     @Override
@@ -1578,12 +2099,14 @@ public final class KnownFonts implements LifecycleListener {
      */
     public static Font[] getAll() {
         return new Font[]{getAStarry(), getAStarry().scaleTo(8, 16).setName("A Starry Tall"), getAStarryMSDF(),
-                getBitter(), getCanada(), getCascadiaMono(),
-                getCascadiaMonoMSDF(), getCaveat(), getCozette(), getDejaVuSansMono(), getGentium(), getGentiumSDF(),
-                getHanazono(), getIBM8x16(), getInconsolata(), getInconsolataMSDF(), getIosevka(), getIosevkaMSDF(),
-                getIosevkaSDF(), getIosevkaSlab(), getIosevkaSlabMSDF(), getIosevkaSlabSDF(), getKingthingsFoundation(),
-                getLibertinusSerif(), getOpenSans(), getOxanium(), getQuanPixel(), getRobotoCondensed(),
-                getTangerine(), getTangerineSDF(), getYanoneKaffeesatz()};
+                getBitter(), getCanada(), getCascadiaMono(), getCascadiaMonoMSDF(), getCaveat(), getCozette(),
+                getDejaVuSansMono(), getGentium(), getGentiumMSDF(), getGentiumSDF(), getGentiumUnItalic(),
+                getGoNotoUniversal(), getGoNotoUniversalSDF(), getHanazono(), getIBM8x16(),
+                getInconsolata(), getInconsolataMSDF(), getIosevka(), getIosevkaMSDF(), getIosevkaSDF(),
+                getIosevkaSlab(), getIosevkaSlabMSDF(), getIosevkaSlabSDF(), getKingthingsFoundation(),
+                getKingthingsPetrock(), getLanaPixel(), getLibertinusSerif(), getNowAlt(), getOpenSans(),
+                getOxanium(), getQuanPixel(), getRobotoCondensed(), getTangerine(), getTangerineSDF(),
+                getYanoneKaffeesatz(), getYanoneKaffeesatzMSDF(), getYataghanMSDF()};
     }
 
     /**
@@ -1595,10 +2118,11 @@ public final class KnownFonts implements LifecycleListener {
      */
     public static Font[] getAllStandard() {
         return new Font[]{getAStarry(), getAStarry().scaleTo(8, 16).setName("A Starry Tall"), getBitter(), getCanada(),
-                getCascadiaMono(), getCaveat(), getCozette(),
-                getGentium(), getHanazono(), getIBM8x16(), getInconsolata(), getIosevka(), getIosevkaSlab(),
-                getKingthingsFoundation(), getLibertinusSerif(), getOpenSans(), getOxanium(), getQuanPixel(),
-                getRobotoCondensed(), getTangerine(), getYanoneKaffeesatz()};
+                getCascadiaMono(), getCaveat(), getCozette(), getGentium(), getGentiumUnItalic(), getGoNotoUniversal(),
+                getHanazono(), getIBM8x16(), getInconsolata(), getIosevka(), getIosevkaSlab(),
+                getKingthingsFoundation(), getKingthingsPetrock(), getLanaPixel(), getLibertinusSerif(), getNowAlt(),
+                getOpenSans(), getOxanium(), getQuanPixel(), getRobotoCondensed(), getTangerine(), getYanoneKaffeesatz()
+        };
     }
 
     /**
@@ -1621,6 +2145,7 @@ public final class KnownFonts implements LifecycleListener {
      *     <li>{@code Future}, which is {@link #getOxanium()},</li>
      *     <li>{@code Console}, which is {@link #getAStarry()}, and</li>
      *     <li>{@code Code}, which is {@link #getCascadiaMono()}.</li>
+     *     <li>{@code Geometric}, which is {@link #getNowAlt()}.</li>
      * </ul>
      * You can also always use the full name of one of these fonts, which can be obtained using {@link Font#getName()}.
      * {@code Serif}, which is {@link #getGentium()}, will always be the default font used after a reset. For
@@ -1630,16 +2155,16 @@ public final class KnownFonts implements LifecycleListener {
      * <br>
      * This will only function at all if all the assets (for every known standard Font) are present and load-able.
      * You should store the result of this method, rather than calling it often, because each call copies many Fonts.
-     * @return a Font that can switch between 15 different Fonts in its FontFamily, to any non-distance-field Font this knows
+     * @return a Font that can switch between 16 different Fonts in its FontFamily, to any of several Fonts this knows
      */
     public static Font getStandardFamily() {
         Font.FontFamily family = new Font.FontFamily(
                 new String[]{"Serif", "Sans", "Mono", "Condensed", "Humanist",
                         "Retro", "Slab", "Handwriting", "Canada", "Cozette", "Iosevka",
-                        "Medieval", "Future", "Console", "Code"},
+                        "Medieval", "Future", "Console", "Code", "Geometric"},
                 new Font[]{getGentium(), getOpenSans(), getInconsolata(), getRobotoCondensed(), getYanoneKaffeesatz(),
                         getIBM8x16(), getIosevkaSlab(), getCaveat(), getCanada(), getCozette(), getIosevka(),
-                        getKingthingsFoundation(), getOxanium(), getAStarry().scale(2, 2), getCascadiaMono()});
+                        getKingthingsFoundation(), getOxanium(), getAStarry().scale(2, 2), getCascadiaMono(), getNowAlt()});
         family.fontAliases.put("Bitter", 0); // for compatibility; Bitter and Gentium look nearly identical anyway...
         return family.connected[0].setFamily(family);
     }
@@ -1647,22 +2172,24 @@ public final class KnownFonts implements LifecycleListener {
     /**
      * Returns a new array of Font instances, calling each getXyz() method in this class that returns any SDF Font.
      * This will only function at all if all the assets (for every known SDF Font) are present and load-able.
-     * You should store the result of this method, rather than calling it often, because each call copies 4 Fonts.
+     * You should store the result of this method, rather than calling it often, because each call copies 5 Fonts.
      * @return a new array containing all SDF Font instances this knows
      */
     public static Font[] getAllSDF() {
-        return new Font[]{getGentiumSDF(), getIosevkaSDF(), getIosevkaSlabSDF(), getTangerineSDF()};
+        return new Font[]{getGentiumSDF(), getGoNotoUniversalSDF(), getIosevkaSDF(), getIosevkaSlabSDF(),
+                getTangerineSDF()};
     }
 
     /**
      * Returns a new array of Font instances, calling each getXyz() method in this class that returns any MSDF Font.
      * This will only function at all if all the assets (for every known MSDF Font) are present and load-able.
-     * You should store the result of this method, rather than calling it often, because each call copies 6 Fonts.
+     * You should store the result of this method, rather than calling it often, because each call copies 9 Fonts.
      * @return a new array containing all MSDF Font instances this knows
      */
     public static Font[] getAllMSDF() {
-        return new Font[]{getAStarryMSDF(), getCascadiaMonoMSDF(), getDejaVuSansMono(), getInconsolataMSDF(), getIosevkaMSDF(),
-                getIosevkaSlabMSDF()};
+        return new Font[]{getAStarryMSDF(), getCascadiaMonoMSDF(), getDejaVuSansMono(),
+                getGentiumMSDF(), getInconsolataMSDF(), getIosevkaMSDF(),
+                getIosevkaSlabMSDF(), getYanoneKaffeesatzMSDF(), getYataghanMSDF()};
     }
 
     @Override
@@ -1708,9 +2235,21 @@ public final class KnownFonts implements LifecycleListener {
             gentium.dispose();
             gentium = null;
         }
+        if (gentiumMSDF != null) {
+            gentiumMSDF.dispose();
+            gentiumMSDF = null;
+        }
         if (gentiumSDF != null) {
             gentiumSDF.dispose();
             gentiumSDF = null;
+        }
+        if (gentiumUnItalic != null) {
+            gentiumUnItalic.dispose();
+            gentiumUnItalic = null;
+        }
+        if (goNotoUniversalSDF != null) {
+            goNotoUniversalSDF.dispose();
+            goNotoUniversalSDF = null;
         }
         if(hanazono != null) {
             hanazono.dispose();
@@ -1756,9 +2295,21 @@ public final class KnownFonts implements LifecycleListener {
             kingthingsFoundation.dispose();
             kingthingsFoundation = null;
         }
+        if (kingthingsPetrock != null) {
+            kingthingsPetrock.dispose();
+            kingthingsPetrock = null;
+        }
+        if (lanaPixel != null) {
+            lanaPixel.dispose();
+            lanaPixel = null;
+        }
         if (libertinusSerif != null) {
             libertinusSerif.dispose();
             libertinusSerif = null;
+        }
+        if (nowAlt != null) {
+            nowAlt.dispose();
+            nowAlt = null;
         }
         if (openSans != null) {
             openSans.dispose();
@@ -1788,9 +2339,21 @@ public final class KnownFonts implements LifecycleListener {
             kaffeesatz.dispose();
             kaffeesatz = null;
         }
+        if (kaffeesatzMSDF != null) {
+            kaffeesatzMSDF.dispose();
+            kaffeesatzMSDF = null;
+        }
+        if (yataghanMSDF != null) {
+            yataghanMSDF.dispose();
+            yataghanMSDF = null;
+        }
         if(twemoji != null) {
             twemoji.dispose();
             twemoji = null;
+        }
+        if(gameIcons != null) {
+            gameIcons.dispose();
+            gameIcons = null;
         }
     }
 }

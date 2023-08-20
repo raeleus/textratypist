@@ -2,6 +2,7 @@ package com.github.tommyettinger.textra;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.graphics.Color;
@@ -11,6 +12,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Cell;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -126,7 +128,7 @@ public class TypingLabelTest extends ApplicationAdapter {
             }
         });
 
-        table.pad(50f);
+        table.pad(20f);
         table.add(label).colspan(5).growX();
         table.row();
         table.add(labelEvent).colspan(5).align(Align.center);
@@ -144,7 +146,7 @@ public class TypingLabelTest extends ApplicationAdapter {
         TypingConfig.DEFAULT_CLEAR_COLOR = Color.WHITE;
 
         // Create some global variables to handle style
-        TypingConfig.GLOBAL_VARS.put("FIRE_WIND", "{FASTER}{GRADIENT=ORANGE;DB6600;-0.5;5}{SLOWER}{WIND=2;4;0.5;0.5}");
+        TypingConfig.GLOBAL_VARS.put("FIRE_WIND", "{GRADIENT=ORANGE;DB6600;-0.5;5}{WIND=2;4;0.5;0.5}");
     }
 
     public TypingLabel createTypingLabel() {
@@ -202,19 +204,20 @@ public class TypingLabelTest extends ApplicationAdapter {
 //        text.append("Imagine the possibilities! =D");
 
         final StringBuilder text = new StringBuilder();
-        text.append("{SLOWER}{GRADIENT=FF70F1;light exciting pink orange of justice;-0.5;5}{EASE=-8;2;1}{SHRINK=2;5}[@Medieval]Welcome,{ENDSHRINK} [@]{WAIT}" +
-                "{SPIRAL=2;0.5;-2.5}{STYLE=/}{STYLE=;}[%^SHADOW]{VAR=title}[%]{STYLE=;}{STYLE=/}{ENDSPIRAL}![] {TRIGGER=lightest violet}[lightest violet][_][+🤔][]{WAIT=0.8}");
+        text.append("{SLOWER}{GRADIENT=FF70F1;light exciting pink orange with ignored words;-0.5;5}{EASE=-8;2;1}{SHRINK=2;5}[@Medieval]Welcome,{ENDSHRINK}[%] [@]{WAIT}");
+        text.append("{SPIRAL=2;0.5;-2.5}{STYLE=/}{STYLE=;}[%^SHADOW]{VAR=title}[%]{STYLE=;}{STYLE=/}{ENDSPIRAL}![ ] {TRIGGER=lightest violet}[lightest violet][+🤔][ ]{WAIT=0.8}");
         text.append("{FAST}\n\n");
-        text.append("{RESET}[@Sans]{ATTENTION}This is a [*][MAROON][%?SHINY]simple[%][WHITE][*] test[@]{ENDATTENTION} to {SPIN}show you{ENDSPIN}");
+        text.append("{RESET}[@Sans]{ATTENTION}This is a [*][MAROON][%?SHINY]simple[WHITE][*] [%?blacken]test[%][@]{ENDATTENTION} to {SPIN}show you{ENDSPIN}");
         text.append("{GRADIENT=27C1F5;2776E7;-0.5;5} {CROWD=20;1;forever}how to make dialogues{ENDCROWD} {JUMP}{SLOW}[*][/]fun[/][*] again! {ENDGRADIENT}[+🥳]{ENDJUMP}{WAIT}\n");
-        text.append("{NORMAL}{CLEARCOLOR}{JOLT=1;0.8;inf;0.25;dddddd;fff0cc}With this library{ENDJOLT} [LIGHTER RICH gold]you[WHITE] can {SQUASH}{SIZE=150%}[_]control[_]{ENDSQUASH} {SIZE=%75}the{SIZE=150%} flow[^][SKY] [[citation needed][] of the text with");
+        text.append("{NORMAL}{CLEARCOLOR}{JOLT=1;0.8;inf;0.25;dddddd;fff0cc}With this library{ENDJOLT} [LIGHTER RICH gold]you[WHITE] can {SQUASH}{SIZE=150%}[_]control[_]{ENDSQUASH} {SIZE=%75}the{SIZE=150%} flow[^][SKY] [[citation needed][ ] of the text with");
         text.append(" {BLINK=FF6BF3;FF0582;3}tokens{ENDBLINK},{WAIT=0.7}");
         text.append("{SPEED=2.50}{COLOR=lighter dull GREEN} making the text go {SHAKE=1.1;0.6;inf}[@Future]really fast[@]{ENDSHAKE}{WAIT=0.5} ");
         text.append("{SPEED=0.25}{COLOR=jade fern}{WAVE=0.66;1;0.5;∞}[@Mono] or extremely slow.[@]{ENDWAVE}");
-        text.append("{RESET} You {HEARTBEAT}[darker red]can also wait[#FFFFFF]{ENDHEARTBEAT} for a {EASE=-15;2;1}second{ENDEASE}{WAIT=1} {EASE=15;8;1}{COLOR=#E6DB74}or two{CLEARCOLOR}{ENDEASE}{WAIT=2},");
-        text.append("{RAINBOW=1;1;0.7} [%?Error]jussst[%] to [%?WARN]catching[%] an [@Console][;]{STYLE=%?jostle}event[%][;][@] in [%?note]code[%]{EVENT=example}!{WAIT} {ENDRAINBOW}");
+        text.append("{RESET} You {HEARTBEAT}[darker red]can also wait[#FFFFFF]{ENDHEARTBEAT} for a {EASE=-15;2;1}[black][%?whiten]second[ ]{ENDEASE}{WAIT=1} {EASE=15;8;1}{COLOR=#E6DB74}or two{CLEARCOLOR}{ENDEASE}{WAIT=2}, ");
+        text.append("[%?Error]jussst[%][.][red][@Canada] spelling[ ] to [%?WARN]catching[%][.][#FFD510FF][@Canada] grammar[ ] an {RAINBOW=1;1;0.7}[@Console][;]{STYLE=%?jostle}event[%][;][@]{ENDRAINBOW} in [%?note]code[%][.][#3088B8FF][@Canada] cool[ ]{EVENT=example}!{WAIT} ");
         text.append("{NORMAL}\n\n");
-        text.append("{VAR=FIRE_WIND}Imagine the [~]bugs[~]! I mean, possibilities! {ENDGRADIENT}[+🔥][+😁][+👏] {RESET}");
+        text.append("{VAR=FIRE_WIND}Imagine the [~]bugs[~]! I mean, possibilities! {ENDGRADIENT}{SPEED=0.1}{CANNON}[+🔥][+😁][+👏] {RESET}");
+
 //        text.append("{VAR=FIRE_WIND}Imagine the {STYLE=STRIKE}bugs{STYLE=STRIKE} possibilities! {ENDGRADIENT}[+🔥][+😁][+👏] {RESET}");
 
 //        text.append("{SLOWER}{GRADIENT=FF70F1;FFC300;-0.5;5}{EASE=-8;2;1}{SHRINK=2;5}[%125][@Medieval]Welcome,[%]{ENDSHRINK}[@] {WAIT}{SPIRAL=2;0.5;-2.5}{STYLE=/}{STYLE=;}{VAR=title}{STYLE=;}{STYLE=/}{ENDSPIRAL}![] [+🤔]{ENDEASE}{WAIT=0.8}");
@@ -236,21 +239,18 @@ public class TypingLabelTest extends ApplicationAdapter {
 //            System.out.println(name);
 
         // Create label
-//        Font font = KnownFonts.getGentiumSDF().scaleTo(36, 36).adjustLineHeight(0.8125f);
-        Font.FontFamily family = new Font.FontFamily(
-                new String[]{
-                        "Serif", "Sans", "Mono", "Medieval", "Future", "Cozette"
-                },
-                new Font[]{
-                        KnownFonts.addEmoji(KnownFonts.getGentium()).scaleTo(24, 26),
-                        KnownFonts.addEmoji(KnownFonts.getOpenSans()).scaleTo(17, 26).adjustLineHeight(0.85f),
-                        KnownFonts.addEmoji(KnownFonts.getInconsolata()).scaleTo(11, 26).adjustLineHeight(0.9375f),
-                        KnownFonts.addEmoji(KnownFonts.getKingthingsFoundation()).scaleTo(26, 26).adjustLineHeight(0.9f),
-                        KnownFonts.addEmoji(KnownFonts.getOxanium()).scaleTo(24, 26).adjustLineHeight(1.05f),
-                        KnownFonts.addEmoji(KnownFonts.getCozette())
-                });
-//        Font font = family.connected[0].setFamily(family);
-        Font font = KnownFonts.addEmoji(KnownFonts.getStandardFamily()).scale(0.8f, 0.8f);
+        Font font = KnownFonts.getStandardFamily();
+//        Font fam = KnownFonts.getStandardFamily();
+//        Font font = KnownFonts.getRobotoCondensed();
+//        fam.family.connected[0] = font;
+//        font.setFamily(fam.family);
+
+        for(Font f : font.family.connected) {
+            if(f != null)
+                KnownFonts.addEmoji(f).scale(0.875f, 0.875f);
+        }
+//        Font condensed = font.family.connected[font.family.fontAliases.get("Condensed", 0)];
+//        condensed.scaleTo(font.cellWidth, font.cellHeight);
         final TypingLabel label = new TypingLabel(text.toString(), font);
         label.setAlignment(Align.left);
         label.setDefaultToken("{EASE}{FADE=0;1;0.33}");
@@ -290,8 +290,9 @@ public class TypingLabelTest extends ApplicationAdapter {
                     else
                         System.out.println("Nothing was copied.");
                 } else {
-                    Color.rgba8888ToColor(flashColor, ColorUtils.describe(event));
-                    ScreenUtils.clear(flashColor);
+                    label.addAction(Actions.fadeOut(4f));
+//                    Color.rgba8888ToColor(flashColor, ColorUtils.describe(event));
+//                    ScreenUtils.clear(flashColor);
                 }
             }
 
@@ -312,7 +313,7 @@ public class TypingLabelTest extends ApplicationAdapter {
 
     @Override
     public void render() {
-        ScreenUtils.clear(0.45f, 0.45f, 0.45f, 1);
+        ScreenUtils.clear(0.4f, 0.4f, 0.4f, 1);
 
         update(Gdx.graphics.getDeltaTime());
 
@@ -336,7 +337,7 @@ public class TypingLabelTest extends ApplicationAdapter {
         config.setTitle("TypingLabel Test");
         config.setWindowedMode(720, 480);
         config.setResizable(true);
-        config.setForegroundFPS(60);
+        config.setForegroundFPS(0);
         config.useVsync(true);
         config.disableAudio(true);
         new Lwjgl3Application(new TypingLabelTest(), config);

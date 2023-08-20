@@ -63,11 +63,12 @@ public class GSTypingUITest extends InputAdapter implements ApplicationListener 
 		TextureRegion image2 = new TextureRegion(texture2);
 
 //		final Font font = new Font("gs/PixPrompt.fnt", "gs" +
-//				"/PixPrompt.png", Font.DistanceFieldType.STANDARD, 0, 0, 0, 0, false)
-//				.scale(2, 2).useIntegerPositions(false);
-		final Font font =
+//				"/PixPrompt.png", Font.DistanceFieldType.STANDARD, 0, 5, 0, 0, false)
+//				.useIntegerPositions(false);
+		final Font font = KnownFonts.getNowAlt();
+//		final Font font =
 //				KnownFonts.getCozette();
-				new Font(skin.getFont("Cozette-standard"), 0f, 0f, 0f, 0f).useIntegerPositions(true);
+//				new Font(skin.getFont("Cozette-standard"), 0f, 0f, 0f, 0f).useIntegerPositions(true);
 //		KnownFonts.getStandardFamily()
 //				new Font(skin.get(Label.LabelStyle.class).font)
 //				.useIntegerPositions(true);
@@ -136,7 +137,7 @@ public class GSTypingUITest extends InputAdapter implements ApplicationListener 
 		fpsLabel = new TypingLabel("fps: 0    [^][SKY][[citation needed]", skin);
 		fpsLabel.setAlignment(Align.center);
 		// configures an example of a TextField in password mode.
-		final TypingLabel passwordLabel = new TypingLabel("[@Medieval]Textfield in [~]secure[] password mode: ", skin, font);
+		final TypingLabel passwordLabel = new TypingLabel("[@Medieval]Textfield in [~]secure[ ] password mode: ", skin, font);
 		final TextField passwordTextField = new TextField("", skin);
 		passwordTextField.setMessageText("password");
 		passwordTextField.setPasswordCharacter('*');
@@ -193,7 +194,7 @@ public class GSTypingUITest extends InputAdapter implements ApplicationListener 
 
 		iconButton.addListener(new ChangeListener() {
 			public void changed (ChangeEvent event, Actor actor) {
-				new TextraDialog("Some TextraDialog", skin, "dialog", font) {
+				new TextraDialog("Some TextraDialog", skin, "default", font) {
 					protected void result (Object object) {
 						System.out.println("Chosen: " + object);
 					}

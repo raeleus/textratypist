@@ -21,9 +21,12 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Cell;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Stack;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
@@ -41,34 +44,41 @@ public class Issue6Test extends ApplicationAdapter {
         viewport = new ScreenViewport();
         viewport.update(Gdx.graphics.getWidth(),Gdx.graphics.getHeight(),true);
         stage = new Stage(viewport);
-        stage.setDebugAll(true);
+//        stage.setDebugAll(true);
 
         Font gentium = KnownFonts.getGentium();
 
-        String text =
-                "[*]Локус контроля[*] - свойство " +
-                        "личности приписывать " +
-                        "свои неудачи и успехи " +
-                        "либо внешним факторам " +
-                        "(погода, везение, другие " +
-                        "люди, судьба-злодейка), " +
-                        "либо внутренним (я сам, " +
-                        "моё отношение, мои" +
-                        "действия)";
+        String text = "Effluvium Spattering Towards Congressmen:\n\nBeginnings...";
+//                "[*]Локус контроля[*] - свойство " +
+//                        "личности приписывать " +
+//                        "свои неудачи и успехи " +
+//                        "либо внешним факторам " +
+//                        "(погода, везение, другие " +
+//                        "люди, судьба-злодейка), " +
+//                        "либо внутренним (я сам, " +
+//                        "моё отношение, мои" +
+//                        "действия)";
         typingLabel = new TypingLabel(
                 text, new Label.LabelStyle(), gentium);
         typingLabel.setWrap(true);
+        typingLabel.setWidth(25f);
         typingLabel.skipToTheEnd();
         typingLabel.setAlignment(center);
+        typingLabel.debug();
+
         textraLabel = new TextraLabel(
                 "[RED]" + text, new Label.LabelStyle(), gentium);
         textraLabel.setWrap(true);
+        textraLabel.setWidth(25f);
         textraLabel.skipToTheEnd();
         textraLabel.setAlignment(center);
-
         Stack stack = new Stack(textraLabel, typingLabel);
-        stack.setFillParent(true);
-        stage.addActor(stack);
+//        Stack stack = new Stack(typingLabel);
+        Table table = new Table();
+        Cell<Actor> stackCell = table.add(stack);
+        stackCell.width(25f);
+        table.setFillParent(true);
+        stage.addActor(table);
     }
 
     @Override
@@ -77,6 +87,7 @@ public class Issue6Test extends ApplicationAdapter {
 
         stage.act();
         stage.draw();
+//        System.out.println(typingLabel.workingLayout.lines());
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 See AUTHORS file.
+ * Copyright (c) 2021-2023 See AUTHORS file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,23 +18,17 @@ package com.github.tommyettinger.textra;
 
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.Pool;
+import com.badlogic.gdx.utils.LongArray;
 
 /**
  * A replacement for libGDX's GlyphLayout, more or less; stores one or more (possibly empty) {@link Line}s of text,
  * which can use color and style markup from {@link Font}, and can be drawn with
  * {@link Font#drawGlyphs(Batch, Layout, float, float, int)}. This is a Poolable class, and you can obtain a Layout with
- * {@code Layout.POOL.obtain()} followed by setting the font, or just using a constructor.
+ * {@code new Layout()} followed by setting the font, or just using a constructor.
  */
-public class Layout implements Pool.Poolable {
-
-    public static final Pool<Layout> POOL = new Pool<Layout>() {
-        @Override
-        protected Layout newObject() {
-            return new Layout();
-        }
-    };
+public class Layout {
 
     protected Font font;
     protected final Array<Line> lines = new Array<>(true, 8);
@@ -45,12 +39,12 @@ public class Layout implements Pool.Poolable {
     protected float baseColor = Color.WHITE_FLOAT_BITS;
 
     public Layout() {
-        lines.add(Line.POOL.obtain());
+        lines.add(new Line());
     }
 
     public Layout(Font font) {
         this.font = font;
-        lines.add(Line.POOL.obtain());
+        lines.add(new Line());
     }
 
     public Layout(Layout other) {
@@ -61,7 +55,7 @@ public class Layout implements Pool.Poolable {
         this.targetWidth = other.targetWidth;
         this.baseColor = other.baseColor;
         for (int i = 0; i < other.lines(); i++) {
-            Line ln = Line.POOL.obtain(), o = other.lines.get(i);
+            Line ln = new Line(), o = other.lines.get(i);
             ln.glyphs.addAll(o.glyphs);
             lines.add(ln.size(o.width, o.height));
         }
@@ -75,9 +69,8 @@ public class Layout implements Pool.Poolable {
     public Layout font(Font font) {
         if (this.font == null || !this.font.equals(font)) {
             this.font = font;
-            Line.POOL.freeAll(lines);
             lines.clear();
-            lines.add(Line.POOL.obtain());
+            lines.add(new Line());
         }
         return this;
     }
@@ -114,9 +107,8 @@ public class Layout implements Pool.Poolable {
     }
 
     public Layout clear() {
-        Line.POOL.freeAll(lines);
         lines.clear();
-        lines.add(Line.POOL.obtain());
+        lines.add(new Line());
         atLimit = false;
         return this;
     }
@@ -162,7 +154,7 @@ public class Layout implements Pool.Poolable {
             return null;
         }
 
-        Line line = Line.POOL.obtain(), prev = lines.peek();
+        Line line = new Line(), prev = lines.peek();
         prev.glyphs.add('\n');
         line.height = 0;
         lines.add(line);
@@ -175,7 +167,7 @@ public class Layout implements Pool.Poolable {
             return null;
         }
         if (index < 0 || index >= maxLines) return null;
-        Line line = Line.POOL.obtain(), prev = lines.get(index);
+        Line line = new Line(), prev = lines.get(index);
         prev.glyphs.add('\n');
         line.height = prev.height;
         lines.insert(index + 1, line);
@@ -269,10 +261,21 @@ public class Layout implements Pool.Poolable {
     }
 
     /**
+     * Calculates how many {@code long} glyphs are currently in this layout, and returns that count. This takes time
+     * proportional to the value of {@link #lines()}, not the number of glyphs.
+     * @return how many {@code long} glyphs are in this Layout
+     */
+    public int countGlyphs(){
+        int layoutSize = 0;
+        for (int i = 0, n = lines.size; i < n; i++) {
+            layoutSize += lines.get(i).glyphs.size;
+        }
+        return layoutSize;
+    }
+    /**
      * Resets the object for reuse. The font is nulled, but the lines are freed, cleared, and then one blank line is
      * re-added to lines so it can be used normally later.
      */
-    @Override
     public void reset() {
         targetWidth = 0f;
         baseColor = Color.WHITE_FLOAT_BITS;
@@ -280,9 +283,6 @@ public class Layout implements Pool.Poolable {
         atLimit = false;
         ellipsis = null;
         font = null;
-        Line.POOL.freeAll(lines);
-        lines.clear();
-        lines.add(Line.POOL.obtain());
     }
 
     /**
@@ -306,26 +306,68 @@ public class Layout implements Pool.Poolable {
     }
 
     /**
-     * Primarily used by {@link #toString()}, but can be useful if you want to append many Layouts into a StringBuilder.
-     * This treats instances of the character u0002 as {@code '['}, as the library does internally, instead of
-     * potentially printing a gibberish character.
-     * This does not add or remove newlines from the Layout's contents, and can produce line breaks if they appear.
-     *
-     * @param sb a non-null StringBuilder from the JDK
+     * Gets a String representation of part of this Layout, made of only the char portions of the glyphs from start
+     * (inclusive) to end (exclusive). This can retrieve text from across multiple lines. If this encounters the special
+     * placeholder character u0002, it treats it as {@code '['}, like the rest of the library does. If this encounters
+     * emoji, icons, or other inline images assigned to the font with {@link Font#addAtlas(TextureAtlas)}, then this
+     * will use a name that can be used to look up that inline image (such as an actual emoji like 🤖 instead of the
+     * gibberish character that {@code [+robot]} produces internally).
+     * @param sb a non-null StringBuilder from the JDK; will be modified if this Layout is non-empty
+     * @param start inclusive start index to begin taking chars from
+     * @param end exclusive end index to stop taking chars before
      * @return sb, for chaining
      */
-    public StringBuilder appendInto(StringBuilder sb) {
-        char gl;
-        for (int i = 0, n = lines.size; i < n; i++) {
-            Line line = lines.get(i);
-            for (int j = 0, ln = line.glyphs.size; j < ln; j++) {
-                gl = (char) line.glyphs.get(j);
-                sb.append(gl == 2 ? '[' : gl);
+    public StringBuilder appendSubstringInto(StringBuilder sb, int start, int end) {
+        start = Math.max(0, start);
+        end = Math.min(Math.max(countGlyphs(), start), end);
+        int index = start;
+        sb.ensureCapacity(end - start);
+        int glyphCount = 0;
+        for (int i = 0, n = lines.size; i < n && index >= 0; i++) {
+            LongArray glyphs = lines.get(i).glyphs;
+            if (index < glyphs.size) {
+                for (int fin = index - start - glyphCount + end; index < fin && index < glyphs.size; index++) {
+                    char c = (char) glyphs.get(index);
+                    if (c >= 0xE000 && c <= 0xF800) {
+                        String name = font.namesByCharCode.get(c);
+                        if (name != null) sb.append(name);
+                        else sb.append(c);
+                    } else {
+                        if (c == 2) sb.append('[');
+                        else sb.append(c);
+                    }
+                    glyphCount++;
+                }
+                if(glyphCount == end - start)
+                    return sb;
+                index = 0;
             }
+            else
+                index -= glyphs.size;
         }
         return sb;
     }
 
+    /**
+     * Primarily used by {@link #toString()}, but can be useful if you want to append many Layouts into a StringBuilder.
+     * If this encounters the special placeholder character u0002, it treats it as {@code '['}, like the rest of the
+     * library does. If this encounters emoji, icons, or other inline images assigned to the font with
+     * {@link Font#addAtlas(TextureAtlas)}, then this will use a name that can be used to look up that inline image
+     * (such as an actual emoji like 🤖 instead of the gibberish character that {@code [+robot]} produces internally).
+     * This does not add or remove newlines from the Layout's contents, and can produce line breaks if they appear.
+     *
+     * @param sb a non-null StringBuilder from the JDK; will be modified if this Layout is non-empty
+     * @return sb, for chaining
+     */
+    public StringBuilder appendInto(StringBuilder sb) {
+        return appendSubstringInto(sb, 0, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Simply delegates to calling {@link #appendInto(StringBuilder)} with a new StringBuilder, calling toString(), and
+     * then returning. See the documentation for appendInto for more details.
+     * @return a String holding the char portions of every glyph in this Layout, substituting in names for inline image codes
+     */
     @Override
     public String toString() {
         return appendInto(new StringBuilder()).toString();
